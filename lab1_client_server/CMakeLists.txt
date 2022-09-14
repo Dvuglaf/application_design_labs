@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.5)
+add_executable(lab1_client_server server.cpp)
+#add_executable(lab1_client_server client.cpp)
+if(WIN32)
+  target_link_libraries(lab1_client_server wsock32 ws2_32)
+endif()
