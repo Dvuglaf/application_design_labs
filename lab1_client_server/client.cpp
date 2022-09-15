@@ -12,16 +12,19 @@ int main() {
 
 	const std::string buffer = "Hello, World!";
 
-	int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	const int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (result != NO_ERROR) {
 		std::cout << "WSAStartup failed with error " << result << std::endl;
 		return 1;
 	}
 
 	try {
-		socket_wrapper connect_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		const socket_wrapper connect_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		connect_socket.connect(AF_INET, port, local_ip);
+
 		connect_socket.send(buffer);
+		std::cout << "Send: " << buffer << std::endl;
+		
 		connect_socket.shutdown();
 	}
 	catch (std::exception& e) {
