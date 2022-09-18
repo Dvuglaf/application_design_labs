@@ -86,6 +86,7 @@ int main() {
 
 		std::cout << "\nDone\n\n";
 
+		cv::namedWindow("Denoised Image", cv::WINDOW_NORMAL);
 		cv::imshow("Denoised Image", denoised_image);
 		cv::waitKey(0);
 	}

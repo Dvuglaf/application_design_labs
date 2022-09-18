@@ -66,6 +66,7 @@ int main(int argc, char* argv[]) {
 		connect_socket.shutdown();
 		std::cout << "Shutdown connection\n\n";
 
+		cv::namedWindow("Noised Image", cv::WINDOW_NORMAL);
 		cv::imshow("Noised Image", noised_image);
 		waitKey(0);
 
