@@ -6,8 +6,8 @@
 #include "socket.h"
 
 
-socket_wrapper::socket_wrapper(int net_protocol, int type, int protocol) {
-	_socket = socket(net_protocol, type, protocol);
+socket_wrapper::socket_wrapper(int internet_protocol, int type, int protocol) {
+	_socket = socket(internet_protocol, type, protocol);
 	if (_socket == INVALID_SOCKET)
 		throw std::runtime_error(std::string("socket function failed with error ") + std::to_string(WSAGetLastError()));
 }
@@ -25,18 +25,16 @@ socket_wrapper& socket_wrapper::operator=(socket_wrapper&& other) noexcept {
 	return *this;
 }
 
-void socket_wrapper::bind(u_short net_protocol, u_short port, const std::string& ip) const {
+void socket_wrapper::bind(u_short internet_protocol, u_short port, const std::string& ip) const {
 	sockaddr_in socket_addr;
 
-	socket_addr.sin_family = net_protocol;
+	socket_addr.sin_family = internet_protocol;
 	socket_addr.sin_port = htons(port);
 	socket_addr.sin_addr.s_addr = inet_addr(ip.c_str());
 
 	int result = ::bind(_socket, reinterpret_cast<SOCKADDR*>(&socket_addr), sizeof(socket_addr));
 	if (result == SOCKET_ERROR)
 		throw std::runtime_error(std::string("bind function failed with error ") + std::to_string(WSAGetLastError()));
-	else
-		std::cout << "bind successful" << std::endl;
 }
 
 void socket_wrapper::connect(u_short internet_protocol, u_short port, const std::string& ip) const {
@@ -49,17 +47,12 @@ void socket_wrapper::connect(u_short internet_protocol, u_short port, const std:
 	const int result = ::connect(_socket, reinterpret_cast<SOCKADDR*>(&socket_addr), sizeof(socket_addr));
 	if (result == SOCKET_ERROR)
 		throw std::runtime_error(std::string("connect function failed with error ") + std::to_string(WSAGetLastError()));
-	else
-		std::cout << "connect successful" << std::endl;
-
 }
 
 void socket_wrapper::listen(int max_connections) const {
 	const int result = ::listen(_socket, max_connections);
 	if (result == SOCKET_ERROR)
 		throw std::runtime_error(std::string("listen function failed with error ") + std::to_string(WSAGetLastError()));
-	else
-		std::cout << "listening on socket..." << std::endl;
 }
 
 socket_wrapper socket_wrapper::accept() const {
@@ -67,29 +60,24 @@ socket_wrapper socket_wrapper::accept() const {
 
 	if (s == INVALID_SOCKET)
 		throw std::runtime_error(std::string("accept function failed with error ") + std::to_string(WSAGetLastError()));
-	else
-		std::cout << "client connected" << std::endl;
 
 	return socket_wrapper(s);
 }
 
-void socket_wrapper::send(const std::string& buffer) const {
-	const int result = ::send(_socket, buffer.c_str(), static_cast<int>(buffer.size()), 0);
+int socket_wrapper::send(const char* buffer, int size) const {
+	const int result = ::send(_socket, buffer, size, 0);
 	if (result == SOCKET_ERROR)
 		throw std::runtime_error(std::string("send function failed with error ") + std::to_string(WSAGetLastError()));
-	else 
-		std::cout << "Bytes send: " << result << std::endl;	
+
+	return result;
 }
 
-std::string socket_wrapper::recv(size_t max_buff_size) const {
-	std::string buffer(max_buff_size, '\0');
-
-	int result = ::recv(_socket, buffer.data(), static_cast<int>(max_buff_size), 0);
+int socket_wrapper::recv(char* buffer, int size) const {
+	int result = ::recv(_socket, buffer, size, 0);
 	if (result < 0)
 		throw std::runtime_error(std::string("recv function failed with error ") + std::to_string(WSAGetLastError()));
 
-	const size_t num_bytes = buffer.find('\0');
-	return buffer.substr(0, num_bytes);
+	return result;
 }
 
 void socket_wrapper::shutdown() const {
