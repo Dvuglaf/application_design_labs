@@ -77,3 +77,5 @@ int main(int argc, char* argv[]) {
 	
 	WSACleanup();
 }
+
+// TODO: impulse noise
