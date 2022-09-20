@@ -19,7 +19,12 @@ socket_wrapper::socket_wrapper(socket_wrapper&& other) noexcept {
 	other._socket = INVALID_SOCKET;
 }
 
-socket_wrapper& socket_wrapper::operator=(socket_wrapper&& other) noexcept {
+socket_wrapper& socket_wrapper::operator=(socket_wrapper&& other) {
+	if (other._socket == this->_socket) {
+		return *this;
+	}
+
+	this->~socket_wrapper();
 	_socket = other._socket;
 	other._socket = INVALID_SOCKET;
 	return *this;
