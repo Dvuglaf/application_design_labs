@@ -79,4 +79,4 @@ int main(int argc, char* argv[]) {
 	WSACleanup();
 }
 
-// TODO: impulse noise
+// TODO: impulse noise instead of additive
