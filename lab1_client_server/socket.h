@@ -5,6 +5,23 @@
 #include <string>
 
 
+enum socket_type {
+	TCP_SOCKET = SOCK_STREAM,
+	UDP_SOCKET = SOCK_DGRAM,
+};
+
+enum address_family {
+	IPV4 = AF_INET,
+	IPV6 = AF_INET6
+};
+
+enum protocol {
+	ICMP = IPPROTO_ICMP,
+	IGMP = IPPROTO_IGMP,
+	TCP = IPPROTO_TCP,
+	UDP = IPPROTO_UDP
+};
+
 class socket_wrapper {
 public:
 	socket_wrapper() = delete;
@@ -14,11 +31,11 @@ public:
 	/**
 	* The socket function creates a socket that is bound to a specific transport service provider.
 	* 
-	* @param internet_protocol address family specification (values in WinSock2.h header).
+	* @param adress_family address family specification (values in WinSock2.h header).
 	* @param type the type specification for the new socket (values in WinSock2.h header).
 	* @param protocol the protocol to be used (values in WinSock2.h header).
 	*/
-	explicit socket_wrapper(int internet_protocol, int type, int protocol);
+	explicit socket_wrapper(int adress_family, int type, int protocol);
 
 	socket_wrapper(const socket_wrapper&) = delete;
 	socket_wrapper& operator=(const socket_wrapper&) = delete;
@@ -87,5 +104,7 @@ public:
 
 private:
 	SOCKET _socket;
+	static WSADATA _wsa;
+	static size_t _socket_count;
 };
 #endif
