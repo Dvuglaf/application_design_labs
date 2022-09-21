@@ -30,20 +30,12 @@ std::vector<int> get_image_size(const socket_wrapper& socket) {
 
 int main() {
 	try {
-		WSADATA wsaData;
-
 		const std::string local_ip = "127.0.0.1";
 		const int port = 7777;
 
-		const int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+		const socket_wrapper master_socket(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP);
 
-		if (result != NO_ERROR)
-			throw std::runtime_error(std::string("WSAStartup failed with error ") + std::to_string(WSAGetLastError()));
-
-
-		const socket_wrapper master_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-		master_socket.bind(AF_INET, port, local_ip);
+		master_socket.bind(address_family::IPV4, port, local_ip);
 		std::cout << "Bind successful" << std::endl;
 
 		master_socket.listen(SOMAXCONN);
@@ -73,6 +65,8 @@ int main() {
 
 		} while (received_bytes > 0);
 
+		image_buffer.shrink_to_fit();
+
 		// Decoding jpeg and denoising noised image
 
 		cv::InputArray data(image_buffer);
@@ -81,8 +75,7 @@ int main() {
 		cv::Mat denoised_image(noised_image.size(), noised_image.type());
 
 		std::cout << "\nDenoising image...\n\n";
-
-		cv::fastNlMeansDenoisingColored(noised_image, denoised_image); // denoising image using median filter
+		cv::medianBlur(noised_image, denoised_image, 3);
 
 		std::cout << "\nDone\n\n";
 
@@ -92,10 +85,7 @@ int main() {
 	}
 	catch (std::exception& e) {
 		std::cout << e.what() << std::endl;
-		WSACleanup();
 	}
-
-	WSACleanup();
 
 	return 0;
 }

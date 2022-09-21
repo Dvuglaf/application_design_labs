@@ -10,13 +10,43 @@
 #include <opencv2/opencv.hpp>
 
 
+cv::Mat add_impulse_noise(const cv::Mat& image, const float intensity) {
+	cv::Mat saltpepper_noise = cv::Mat::zeros(image.rows, image.cols, CV_8U);
+	cv::randu(saltpepper_noise, 0, 255);
+
+	const int intensities[2] = {
+		0. + std::round(255 * intensity / 2),
+		255. - std::round(255 * intensity / 2)
+	};
+
+	cv::Mat black = saltpepper_noise < intensities[0];
+	cv::Mat white = saltpepper_noise > intensities[1];
+
+	cv::Mat noised_image = image.clone();
+	noised_image.setTo(255, white);
+	noised_image.setTo(0, black);
+
+	return noised_image;
+}
+
+cv::Mat add_gaussian_noise(const cv::Mat& image) {
+	cv::Mat noised_image(image.size(), image.type());
+
+	const std::vector<float> m = { 10, 12, 11 }; // noise means of each channel
+	const std::vector<float> sigma = { 20, 20, 20 }; // noise mse f each channel
+
+	cv::randn(noised_image, m, sigma); // generating noise
+	noised_image += image; // additive
+
+	return noised_image;
+}
+
 int main(int argc, char* argv[]) {
 	try {
-		using namespace cv;
 		using namespace my_utils;
 
-		// Check number of arguments: first - programm name, second - path
-		if (argc != 2) {
+		// Check number of arguments: first - programm name, second - path, third - intensivity of s&p noise
+		if (argc != 3) {
 			throw std::invalid_argument("Error: enter only a path to image");
 		}
 
@@ -24,18 +54,12 @@ int main(int argc, char* argv[]) {
 
 		auto image = read_image(path);
 
-		WSADATA wsaData;
-		const int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-
-		if (result != NO_ERROR)
-			throw std::runtime_error(std::string("WSAStartup failed with error ") + std::to_string(WSAGetLastError()));
-
 		const std::string local_ip = "127.0.0.1";
 		const int port = 7777;
 
-		const socket_wrapper connect_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		const socket_wrapper connect_socket(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP);
 
-		connect_socket.connect(AF_INET, port, local_ip);
+		connect_socket.connect(address_family::IPV4, port, local_ip);
 		std::cout << "Connect successful" << std::endl;
 
 		// Firstly send image size ("SIZE_1 SIZE_2")
@@ -45,15 +69,10 @@ int main(int argc, char* argv[]) {
 		const int bytes_sent_size = connect_socket.send(image_size.c_str(), static_cast<int>(image_size.size()));
 		std::cout << "\tSend " << bytes_sent_size << " bytes\n";
 
-		// Secondly send jpeg compressed noised image with additive noise (white)
+		// Secondly send jpeg compressed noised image with impulse noise (s&p)
+		const float intensity = std::stof(argv[2]);
 
-		const std::vector<float> m = { 10, 12, 11 }; // noise means of each channel
-		const std::vector<float> sigma = { 20, 20, 20 }; // noise mse f each channel
-
-		cv::Mat noised_image(image.size(), image.type());
-
-		cv::randn(noised_image, m, sigma); // generating noise
-		noised_image += image; // additive
+		cv::Mat noised_image = add_impulse_noise(image, intensity);
 
 		std::vector<uchar> image_buffer;
 		cv::imencode(".jpg", noised_image, image_buffer); // jpeg image compression
@@ -68,15 +87,12 @@ int main(int argc, char* argv[]) {
 
 		cv::namedWindow("Noised Image", cv::WINDOW_NORMAL);
 		cv::imshow("Noised Image", noised_image);
-		waitKey(0);
+		cv::waitKey(0);
 
 	}
 	catch (const std::exception& e) {
 		std::cout << e.what();
-		WSACleanup();
 	}
-	
-	WSACleanup();
-}
 
-// TODO: impulse noise instead of additive
+	return 0;
+}
