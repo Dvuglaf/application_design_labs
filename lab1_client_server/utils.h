@@ -56,7 +56,7 @@ namespace my_utils {
 	 * 
 	 * @return cv::Mat class matrix with double values (64 bytes).
 	 */
-	cv::Mat mat_from_string(std::string string, const cv::MatSize& size);
+	cv::Mat mat_from_string(const std::string& string, const cv::MatSize& size);
 
 	/**
 	 * Convert cv::Mat class matrix to string as std::cout

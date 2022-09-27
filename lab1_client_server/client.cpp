@@ -15,8 +15,8 @@ cv::Mat add_impulse_noise(const cv::Mat& image, const float intensity) {
 	cv::randu(saltpepper_noise, 0, 255);
 
 	const int intensities[2] = {
-		0. + std::round(255 * intensity / 2),
-		255. - std::round(255 * intensity / 2)
+		static_cast<int>(0. + std::round(255 * intensity / 2)),
+		static_cast<int>(255. - std::round(255 * intensity / 2))
 	};
 
 	cv::Mat black = saltpepper_noise < intensities[0];
@@ -46,9 +46,8 @@ int main(int argc, char* argv[]) {
 		using namespace my_utils;
 
 		// Check number of arguments: first - programm name, second - path, third - intensivity of s&p noise
-		if (argc != 3) {
+		if (argc != 3)
 			throw std::invalid_argument("Error: enter only a path to image");
-		}
 
 		const std::string path = argv[1];
 
@@ -63,7 +62,6 @@ int main(int argc, char* argv[]) {
 		std::cout << "Connect successful" << std::endl;
 
 		// Firstly send image size ("SIZE_1 SIZE_2")
-
 		std::string image_size = std::to_string(image.rows) + " " + std::to_string(image.cols);
 
 		const int bytes_sent_size = connect_socket.send(image_size.c_str(), static_cast<int>(image_size.size()));

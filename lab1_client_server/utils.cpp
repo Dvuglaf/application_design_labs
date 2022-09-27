@@ -9,12 +9,11 @@
 
 cv::Mat my_utils::read_image(const std::string& image_path) {
 	cv::Mat image = cv::imread(cv::samples::findFile(image_path), cv::IMREAD_COLOR);
-	if (image.empty()) {
+	if (image.empty())
 		throw std::invalid_argument("Could not read the image");
-	}
+
 	return image;
 }
-
 
 std::vector<cv::Mat> my_utils::dft(const cv::Mat& source) {
 	cv::Mat float_source;
@@ -57,21 +56,23 @@ std::vector<std::string> my_utils::split(const std::string& string, const std::s
 	return tokens;
 }
 
-cv::Mat my_utils::mat_from_string(std::string string, const cv::MatSize& size) {
+cv::Mat my_utils::mat_from_string(const std::string& string, const cv::MatSize& size) {
 	std::vector<double> vec;
 
-	string = std::regex_replace(string, std::regex(";"), ",");  //; -> ,
-	string = std::regex_replace(string, std::regex("[^\\d,.-]"), "");  // delete all characters except digits, ',' '.' '-'
+	auto edit_string = std::regex_replace(string, std::regex(";"), ",");  //; -> ,
+	edit_string = std::regex_replace(edit_string, std::regex("[^\\d,.-]"), "");  // delete all characters except digits, ',' '.' '-'
 
-	auto splitted = my_utils::split(string, ",");
+	auto splitted = my_utils::split(edit_string, ",");
+
+	vec.reserve(splitted.size());
 
 	for (int i = 0; i < splitted.size(); ++i)
 		vec.push_back(std::stod(splitted[i]));
 
 	cv::Mat mat = cv::Mat::zeros(size[0], size[1], CV_64F);
 
-	for (int i = 0; i < size[0]; ++i)
-		for (int j = 0; j < size[1]; ++j)
+	for (size_t i = 0; i < size[0]; ++i)
+		for (size_t j = 0; j < size[1]; ++j)
 			mat.at<double>(i, j) = vec[j + i * 224];
 
 	return mat;
