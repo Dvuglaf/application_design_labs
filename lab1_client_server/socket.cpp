@@ -105,7 +105,6 @@ void socket_wrapper::shutdown() const {
 	
 socket_wrapper::~socket_wrapper() {
 	if (_socket != INVALID_SOCKET) {
-
 		const int close_result = ::closesocket(_socket);
 		if (close_result != 0)
 			std::cerr << "closesocket function failed with error " << WSAGetLastError() << std::endl;
