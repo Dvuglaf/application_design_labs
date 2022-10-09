@@ -9,5 +9,6 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 add_subdirectory(lab1_client_server)
+add_subdirectory(lab2_chord)
 
 
