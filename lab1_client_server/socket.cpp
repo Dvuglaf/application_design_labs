@@ -97,12 +97,12 @@ int socket_wrapper::recv(char* buffer, int size) const {
 	return result;
 }
 
-void socket_wrapper::shutdown() const {
-	const int result = ::shutdown(_socket, SD_BOTH);
+void socket_wrapper::shutdown(u_short type) const {
+	const int result = ::shutdown(_socket, type);
 	if (result == SOCKET_ERROR)
 		throw std::runtime_error(std::string("shutdown function failed with error ") + std::to_string(WSAGetLastError()));
 }
-	
+
 socket_wrapper::~socket_wrapper() {
 	if (_socket != INVALID_SOCKET) {
 		const int close_result = ::closesocket(_socket);
