@@ -4,6 +4,7 @@
 #include <thread>
 #include <iostream>
 #include "utils.h"
+#include <algorithm>
 
 #define to_number(x) std::stoul(x)
 
@@ -114,6 +115,12 @@ std::string chord_node::execute(const std::string& procedure_name, const std::st
 		update_finger_table_leave(to_number(args[0]), to_number(args[1]),
 			args[2], to_number(args[3]), to_number(args[4]));
 	}
+	else if (procedure_name == "insert_key") {
+		_keys.push_back(to_number(procedure_args));
+	}
+	else if (procedure_name == "update_keys") {
+		update_keys();
+	}
 	else
 		throw std::runtime_error("unknown procedure name");
 
@@ -170,7 +177,7 @@ std::string chord_node::find_predecessor(size_type target_id) {
 std::string chord_node::closest_preceding_finger(size_type target_id) {
 	for (int i = _m - 1; i >= 0; --i) {  
 
-		// finger_table[i].node in (n, target_id)
+		// finger_table[i]._id in (_n, target_id)
 		if (does_belong(_finger_table[i]._id, _id, target_id, false, false)) {  
 			return std::to_string(_finger_table[i]._id) + std::string(";") +
 				_finger_table[i]._ip + std::string(";") +
@@ -183,7 +190,7 @@ std::string chord_node::closest_preceding_finger(size_type target_id) {
 		std::to_string(_port);
 }
 
-size_type chord_node::get_start(size_type i) {
+size_type chord_node::get_start(size_type i) noexcept {
 	if (i == 0) {
 		return (_id + 1) % (1 << _m);
 	}
@@ -193,12 +200,14 @@ size_type chord_node::get_start(size_type i) {
 }
 
 void chord_node::join(size_type id, const std::string& ip, size_type port) {
+	if (_joined)
+		return;
 	if (_id == id) {  // first joined node to the ring
 		if (ip != _ip) {
-			throw std::invalid_argument("Enter your ip.");
+			throw std::invalid_argument("Enter ip or existing node. Or enter your ip for new network.");
 		}
 		if (port != _port) {
-			throw std::invalid_argument("Enter your port.");
+			throw std::invalid_argument("Enter port or existing node. Or enter your port for new network.");
 		}
 		for (size_type i = 0; i < _m; ++i) {
 			_finger_table.push_back({
@@ -219,18 +228,25 @@ void chord_node::join(size_type id, const std::string& ip, size_type port) {
 
 		_ip = ip;
 		_port = port;
+		_joined = true;
 	}
 	else {
 		init_finger_table(id, ip, port);
 		update_others_join();
+		_joined = true;
+		
+		// Update keys in successor
+		remote_procedure_call(_finger_table[0]._id, _finger_table[0]._ip, _finger_table[0]._port,
+			std::string("update_keys"), std::string(""));
 	}
+
 }
 
 void chord_node::init_finger_table(size_type id, const std::string& ip, size_type port) {
 	std::string get = remote_procedure_call(id, ip, port, "find_successor", std::to_string(get_start(0)));
 	auto succ = split(get, ";");
 
-	_finger_table.push_back({
+	_finger_table.push_back({  // 0th row is our successor
 				get_start(0),
 				std::make_pair<size_type, size_type>(
 					get_start(0),
@@ -342,6 +358,9 @@ void chord_node::leave() {
 		std::string("set_predecessor"), args);
 
 	update_others_leave();
+	_joined = false;
+
+	update_keys(); 
 }
 
 void chord_node::update_others_leave() {
@@ -392,15 +411,17 @@ void chord_node::cli(size_type command_id) {
 		std::string value;
 
 		std::cout << "Enter ID: ";
-		std::cin >> value;
+		std::getline(std::cin, value);
+		check_users_params(value);
 		id = to_number(value);
 
 		std::cout << "Enter IP: ";
-		std::cin >> value;
+		std::getline(std::cin, value);
 		ip = value;
 
 		std::cout << "Enter PORT: ";
-		std::cin >> value;
+		std::getline(std::cin, value);
+		check_users_params(value);
 		port = to_number(value);
 
 		check_users_params(id, ip, port);
@@ -417,12 +438,56 @@ void chord_node::cli(size_type command_id) {
 				<< _finger_table[i]._ip << ":"
 				<< _finger_table[i]._port << ">" << std::endl;
 		}
-		std::cout << "Successor_ID: " << _finger_table[0]._id;
-		std::cout << "\nPredecessor_ID: " << _predecessor._id;
-		std::cout << std::endl;
+		std::cout << "Keys: [";
+		std::for_each(_keys.begin(), _keys.end(), [](size_type key) {std::cout << key << ", "; });
+		std::cout << "]\n";
+
+		std::cout << "Successor_ID: " << _finger_table[0]._id << std::endl;
+		std::cout << "Predecessor_ID: " << _predecessor._id << std::endl;
 	}
 	else if (command_id == 2) {
 		leave();
 		std::cout << "Leave successful\n";
 	}
+	else if (command_id == 3) {
+		std::string value;
+		std::cout << "Enter KEY: ";
+		std::getline(std::cin, value);
+		check_users_params(value);
+
+		put_key(to_number(value));
+		std::cout << "Key was put successful\n";
+	}
+	else if (command_id == 4) {
+		std::string value;
+		std::cout << "Enter KEY: ";
+		std::getline(std::cin, value);
+		check_users_params(value);
+
+		std::string get = find_successor(to_number(value));
+		size_type succ_of_key_id = to_number(split(get, ";")[0]);
+
+		std::cout << "Key " << value << " found in node " << succ_of_key_id << std::endl;
+	}
 }
+
+void chord_node::put_key(size_type key) {
+	if (key == _id && _joined) {  // if node is leave we don't need to self assignment key
+		_keys.push_back(key);
+		return;
+	}
+	std::string get = find_successor(key);
+	auto succ_of_key = split(get, ";");
+
+	remote_procedure_call(to_number(succ_of_key[0]), succ_of_key[1], to_number(succ_of_key[2]),
+		"insert_key", std::to_string(key));  // ask successor of node with index 'key' insert this key
+}
+
+void chord_node::update_keys() {
+	std::vector<size_type> keys = std::move(_keys);  // move all keys from this node
+	for (auto key : keys) {
+		put_key(key);  // reassigned keys to it's successors
+	}
+}
+
+//TODO: update_keys: can move keys from successor, which in interval [new, new.successor)
