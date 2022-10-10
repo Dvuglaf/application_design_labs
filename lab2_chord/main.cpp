@@ -1,33 +1,54 @@
 #include "chord.h"
+#include "utils.h"
 #include <iostream>
 #include <string>
 
 
 int main(int argc, char* argv[]) {
+	try {
+		if (argc != 4) {
+			throw std::invalid_argument("Enter 3 argument: ID, IP, PORT");
+		}
+		check_users_params(std::atoi(argv[1]), std::string(argv[2]), std::atoi(argv[3]));
+	}
+	catch (const std::invalid_argument& e) {
+		std::cout << e.what() << std::endl;
+		exit(1);
+	}
+
 	std::cout << "*************************** CHORD **************************" << std::endl;
 
-	std::string cmd;
-
 	chord_node node(std::atoi(argv[1]), std::string(argv[2]), std::atoi(argv[3]));
-	//chord_node node(1, std::string("127.0.0.1"), 5001);
+	std::string enter;
 
-	try {
-		while (true) {
+	while (true) {
+		try {
 			std::cout << "chord_prompt$ ";
-			std::cin >> cmd;
+			std::cin >> enter;
 
-			if (cmd == "join")
+			if (enter == "join") {
 				node.cli(0);
-			else if (cmd == "display")
+			}
+			else if (enter == "display") {
 				node.cli(1);
-			else if (cmd == "find_successor")
+			}
+			else if (enter == "leave") {
 				node.cli(2);
-			else if (cmd == "find_predecessor")
-				node.cli(3);
+				break;
+			}
+			else if (enter == "cls") {
+				system("cls");
+				std::cout << "*************************** CHORD **************************" << std::endl;
+			}
+		}
+		catch (const std::invalid_argument& e) {
+			std::cout << e.what() << std::endl;
+		}
+		catch (const std::runtime_error& e) {  // socket problem
+			std::cout << e.what() << std::endl;
+			return 1;
 		}
 	}
-	catch(std::exception & e) {
-		std::cout << e.what();
-	}
+
 	return 0;
 }
