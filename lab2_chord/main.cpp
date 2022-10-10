@@ -24,7 +24,15 @@ int main(int argc, char* argv[]) {
 	while (true) {
 		try {
 			std::cout << "chord_prompt$ ";
-			std::cin >> enter;
+			std::getline(std::cin, enter);
+
+			// Check if user enter contains space and tabulations
+			auto splitted_space = split(enter, " ");
+			auto splitted_tab = split(enter, "\t");
+
+			if (splitted_space.size() != 1 || splitted_tab.size() != 1) {
+				throw std::invalid_argument("Wrong input.");
+			}
 
 			if (enter == "join") {
 				node.cli(0);
@@ -39,6 +47,15 @@ int main(int argc, char* argv[]) {
 			else if (enter == "cls") {
 				system("cls");
 				std::cout << "*************************** CHORD **************************" << std::endl;
+			}
+			else if (enter == "put") {
+				node.cli(3);
+			}
+			else if (enter == "find") {
+				node.cli(4);
+			}
+			else {
+				throw std::invalid_argument("Invalid command.");
 			}
 		}
 		catch (const std::invalid_argument& e) {
