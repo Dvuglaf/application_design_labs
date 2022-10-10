@@ -37,9 +37,9 @@ public:
 	/**
 	* The socket function creates a socket that is bound to a specific transport service provider.
 	* 
-	* @param adress_family address family specification (values in WinSock2.h header).
-	* @param type the type specification for the new socket (values in WinSock2.h header).
-	* @param protocol the protocol to be used (values in WinSock2.h header).
+	* @param adress_family: address family specification (values in WinSock2.h header)
+	* @param type: the type specification for the new socket (values in WinSock2.h header)
+	* @param protocol: the protocol to be used (values in WinSock2.h header)
 	*/
 	explicit socket_wrapper(int adress_family, int type, int protocol);
 
@@ -54,58 +54,59 @@ public:
 	/**
 	 * The bind function associates a local address with a socket.
 	 *
-	 * @param internet_protocol address family specification (values in WinSock2.h header).
-	 * @param port.
-	 * @param ip address.
+	 * @param internet_protocol: address family specification (values in WinSock2.h header)
+	 * @param port: port
+	 * @param ip: ip address
 	 */
 	void bind(u_short internet_protocol, u_short port, const std::string& ip) const ;
 
 	/**
 	* The connect function establishes a connection to a specified socket.
 	*
-	* @param internet_protocol address family specification (values in WinSock2.h header).
-	* @param port.
-	* @param ip address.
+	* @param internet_protocol: address family specification (values in WinSock2.h header)
+	* @param port: port
+	* @param ip: ip address
 	*/
 	void connect(u_short internet_protocol, u_short port, const std::string& ip) const;
 
 	/**
 	* The listen function places a socket in a state in which it is listening for an incoming connection.
 	* 
-	* @param max_connections the maximum length of the queue of pending connections.
+	* @param max_connections: the maximum length of the queue of pending connections
 	*/
 	void listen(int max_connections) const;
 
 	/**
 	* The accept function permits an incoming connection attempt on a socket.
 	*
-	* @return a handle for the socket on which the actual connection is made.
+	* @return a handle for the socket on which the actual connection is made
 	*/
 	socket_wrapper accept() const;
 
 	/**
 	* The send function sends data on a connected socket.
 	*
-	* @param buffer data to send.
-	* @param size bytes of sending data
+	* @param buffer: data to send
+	* @param size: bytes of sending data
 	* 
-	* @return the total number of bytes sent.
+	* @return the total number of bytes sent
 	*/
 	int send(const char* buffer, int size) const; 
 
 	/**
 	* The recv function receives data from a connected socket or a bound connectionless socket
 	*
-	* @param buffer a pointer to the buffer to receive the incoming data.
-	* @param size bytes to receive the incoming data
+	* @param buffer: a pointer to the buffer to receive the incoming data
+	* @param size: bytes to receive the incoming data
 	*
-	* @return the number of bytes received and the buffer pointed to by the buffer parameter will contain this data received.
+	* @return the number of bytes received and the buffer pointed to by the buffer parameter will contain this data received
 	*/
 	int recv(char* buffer, int size) const;
 
 	/**
 	* The shutdown function disables both send and receive operations.
-	* @param type of shutdown (only for receive, only for send, both).
+	* 
+	* @param type: type of shutdown (only for receive, only for send, both)
 	*/
 	void shutdown(u_short type) const;
 
