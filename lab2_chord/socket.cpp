@@ -7,7 +7,7 @@
 
 
 size_t socket_wrapper::_socket_count = 0;
-WSADATA socket_wrapper::_wsa;
+WSADATA socket_wrapper::_wsa; 
 
 socket_wrapper::socket_wrapper(int adress_family, int type, int protocol) {
 	if (_socket_count == 0) {

@@ -91,7 +91,7 @@ public:
 	* 
 	* @return the total number of bytes sent.
 	*/
-	int send(const char* buffer, int size) const;
+	int send(const char* buffer, int size) const; 
 
 	/**
 	* The recv function receives data from a connected socket or a bound connectionless socket
