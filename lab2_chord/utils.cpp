@@ -107,3 +107,12 @@ void check_users_params(unsigned long id, const std::string& ip, unsigned long p
 		}
 	}
 }
+
+void check_users_params(const std::string& number) {
+	try {
+		auto pass = std::stoul(number);
+	}
+	catch (...) {
+		throw std::invalid_argument("Not a number.");
+	}
+}
