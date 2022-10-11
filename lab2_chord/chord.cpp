@@ -14,6 +14,7 @@ chord_node::chord_node(size_type id, const std::string& ip, size_type port) {
 	_id = id;
 	_ip = ip;
 	_port = port;
+	_joined = false;
 
 	std::thread server(&chord_node::start, this);
 	server.detach();

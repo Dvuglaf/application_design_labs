@@ -26,14 +26,6 @@ int main(int argc, char* argv[]) {
 			std::cout << "chord_prompt$ ";
 			std::getline(std::cin, enter);
 
-			// Check if user enter contains space and tabulations
-			auto splitted_space = split(enter, " ");
-			auto splitted_tab = split(enter, "\t");
-
-			if (splitted_space.size() != 1 || splitted_tab.size() != 1) {
-				throw std::invalid_argument("Wrong input.");
-			}
-
 			if (enter == "join") {
 				node.cli(0);
 			}
