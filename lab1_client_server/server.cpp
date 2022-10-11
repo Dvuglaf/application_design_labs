@@ -20,7 +20,7 @@ std::vector<int> get_image_size(const socket_wrapper& socket) {
 
 	std::cout << "\tReceived " << received_bytes << " bytes\n";
 
-	auto values = my_utils::split(std::string(buffer), " ");
+	auto values = split(std::string(buffer), " ");
 
 	image_size.push_back(std::stoi(values[0]));
 	image_size.push_back(std::stoi(values[1]));

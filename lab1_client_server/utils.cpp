@@ -7,7 +7,7 @@
 #include <regex>
 
 
-cv::Mat my_utils::read_image(const std::string& image_path) {
+cv::Mat read_image(const std::string& image_path) {
 	cv::Mat image = cv::imread(cv::samples::findFile(image_path), cv::IMREAD_COLOR);
 	if (image.empty())
 		throw std::invalid_argument("Could not read the image");
@@ -15,7 +15,7 @@ cv::Mat my_utils::read_image(const std::string& image_path) {
 	return image;
 }
 
-std::vector<cv::Mat> my_utils::dft(const cv::Mat& source) {
+std::vector<cv::Mat> dft(const cv::Mat& source) {
 	cv::Mat float_source;
 	source.convertTo(float_source, CV_32FC1, 1. / 255.);
 
@@ -32,7 +32,7 @@ std::vector<cv::Mat> my_utils::dft(const cv::Mat& source) {
 	return dft;
 }
 
-cv::Mat my_utils::idft(const cv::Mat& source) {
+cv::Mat idft(const cv::Mat& source) {
 	cv::Mat idft_output;
 
 	dft(source, idft_output, cv::DFT_SCALE | cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT);
@@ -43,7 +43,7 @@ cv::Mat my_utils::idft(const cv::Mat& source) {
 	return uint8_idft_output;
 }
 
-std::vector<std::string> my_utils::split(const std::string& string, const std::string& delimiter) {
+std::vector<std::string> split(const std::string& string, const std::string& delimiter) {
 	std::vector<std::string> tokens;
 	size_t previous = 0, position = 0;
 	do {
@@ -56,13 +56,13 @@ std::vector<std::string> my_utils::split(const std::string& string, const std::s
 	return tokens;
 }
 
-cv::Mat my_utils::mat_from_string(const std::string& string, const cv::MatSize& size) {
+cv::Mat mat_from_string(const std::string& string, const cv::MatSize& size) {
 	std::vector<double> vec;
 
 	auto edit_string = std::regex_replace(string, std::regex(";"), ",");  //; -> ,
 	edit_string = std::regex_replace(edit_string, std::regex("[^\\d,.-]"), "");  // delete all characters except digits, ',' '.' '-'
 
-	auto splitted = my_utils::split(edit_string, ",");
+	auto splitted = split(edit_string, ",");
 
 	vec.reserve(splitted.size());
 
@@ -78,7 +78,7 @@ cv::Mat my_utils::mat_from_string(const std::string& string, const cv::MatSize& 
 	return mat;
 }
 
-std::string my_utils::mat_to_string(const cv::Mat& matrix) {
+std::string mat_to_string(const cv::Mat& matrix) {
 	std::string result;
 	result << matrix;
 	return result;

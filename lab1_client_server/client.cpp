@@ -43,8 +43,6 @@ cv::Mat add_gaussian_noise(const cv::Mat& image) {
 
 int main(int argc, char* argv[]) {
 	try {
-		using namespace my_utils;
-
 		// Check number of arguments: first - programm name, second - path, third - intensivity of s&p noise
 		if (argc != 3)
 			throw std::invalid_argument("Error: enter only a path to image");
@@ -80,7 +78,7 @@ int main(int argc, char* argv[]) {
 
 		std::cout << "\tSend " << bytes_sent_image << " bytes\n";
 
-		connect_socket.shutdown();
+		connect_socket.shutdown(shutdown_type::BOTH);
 		std::cout << "Shutdown connection\n\n";
 
 		cv::namedWindow("Noised Image", cv::WINDOW_NORMAL);
