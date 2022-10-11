@@ -145,7 +145,8 @@ private:  // This section presents the methods that are executed in the node whe
 	*/
 	void put_key(size_type key);
 
-private:  // This section presents the methods that are executed in the node when it acts both as client and server.
+private:  // This section presents the methods that are executed in the node when it acts both as client and server /
+		  // Can call directly from the class object itself or with remote procedure call.
 	/*
 	* Find successor of target_id node.
 	*
