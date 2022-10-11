@@ -1,10 +1,11 @@
-﻿#include "chord.h"
-#include <string>
-#include "socket.h"
+﻿#include <string>
 #include <thread>
 #include <iostream>
-#include "utils.h"
 #include <algorithm>
+#include "utils.h"
+#include "socket.h"
+#include "chord.h"
+
 
 #define to_number(x) std::stoul(x)
 

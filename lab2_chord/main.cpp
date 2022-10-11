@@ -1,8 +1,7 @@
-#include "chord.h"
-#include "utils.h"
 #include <iostream>
 #include <string>
-
+#include "chord.h"
+#include "utils.h"
 
 int main(int argc, char* argv[]) {
 	try {

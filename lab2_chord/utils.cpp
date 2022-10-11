@@ -1,10 +1,10 @@
-#include "utils.h"
 #include <vector>
 #include <string>
-#include "socket.h"
 #include <exception>
 #include <iostream>
 #include "chord.h"
+#include "utils.h"
+#include "socket.h"
 
 std::vector<std::string> split(const std::string& string, const std::string& delimiter) {
 	std::vector<std::string> tokens;
