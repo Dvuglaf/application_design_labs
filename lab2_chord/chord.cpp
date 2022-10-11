@@ -206,10 +206,10 @@ void chord_node::join(size_type id, const std::string& ip, size_type port) {
 		return;
 	if (_id == id) {  // first joined node to the ring
 		if (ip != _ip) {
-			throw std::invalid_argument("Enter ip or existing node. Or enter your ip for new network.");
+			throw std::invalid_argument("Enter ip of existing node. Or enter your ip for new network.");
 		}
 		if (port != _port) {
-			throw std::invalid_argument("Enter port or existing node. Or enter your port for new network.");
+			throw std::invalid_argument("Enter port of existing node. Or enter your port for new network.");
 		}
 		for (size_type i = 0; i < _m; ++i) {
 			_finger_table.push_back({

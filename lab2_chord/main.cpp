@@ -8,10 +8,13 @@ int main(int argc, char* argv[]) {
 		if (argc != 4) {
 			throw std::invalid_argument("Enter 3 argument: ID, IP, PORT");
 		}
-		check_users_params(std::atoi(argv[1]), std::string(argv[2]), std::atoi(argv[3]));
+		check_users_params(std::stoul(argv[1]), std::string(argv[2]), std::stoul(argv[3]));
 	}
 	catch (const std::invalid_argument& e) {
-		std::cout << e.what() << std::endl;
+		if (e.what() == "invalid stoul argument")
+			std::cout << e.what() << std::endl;
+		else
+			std::cout << "Enter a number!";
 		exit(1);
 	}
 
