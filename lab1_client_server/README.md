@@ -1,17 +1,16 @@
-Лабораторная работа #1. Клиент-серверная архитектура.
+Laboratory work #1. Client-server architecture.
 
-Изображение передается от клиента к серверу через сокеты Беркли. 
-Имитируется искажение при передаче путем добавления импульсного шума к изображению.
-Все ошибки обрабатываются и текст выводится в консоли.
+The image is transmitted from the client to the server via Berkeley sockets.
+Transmission distortion is simulated by adding pulse noise to the image.
+All errors are processed and the text is displayed in the console.
 
-На стороне клиента добавляется шум к изображению. Изображение сжимается алгоритмом JPEG и передается.
+On the client side, noise is added to the image. The image is compressed by the JPEG algorithm and transmitted.
 
-На стороне сервера изображение декодируется и подвергается медианной фильтрации.
+On the server side, the image is decoded and subjected to median filtering.
 
-ЗАПУСК:
+Launch:
 
-Собрать проект CMAKE.
+Build a CMAKE project.
 
-Запустить сначала сервер (server.exe).
-Запустить клиент (client.exe) с аргументами командной строки - полный путь до изображения и интенсивность шума.
- 
+Start the server first (server.exe ).
+Launch the client (client.exe ) with command line arguments - the full path to the image and the noise intensity.
