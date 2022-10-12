@@ -1,4 +1,6 @@
 ﻿/.vs
+/.vscode
+/build
 /out
 /lab_1_client_server/out
 /CMakeSettings.json
