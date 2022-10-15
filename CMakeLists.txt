@@ -10,5 +10,4 @@ endif()
 
 add_subdirectory(lab1_client_server)
 add_subdirectory(lab2_chord)
-
-
+add_subdirectory(lab3_simple_torrent)
