@@ -2,6 +2,7 @@
 /.vscode
 /build
 /out
-/lab_1_client_server/out
+/lab1_client_server/out
 /CMakeSettings.json
 /lab1_client_server/out/build/x64-Debug
+
