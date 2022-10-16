@@ -11,51 +11,50 @@ bencode_element::bencode_element(const __types_variant& value) : _value(value), 
 
 size_t bencode_element::get_type() const noexcept { return _index; }
 
-const auto& bencode_element::get_value() const noexcept { return _value; }
+const bencode_element::__types_variant& bencode_element::get_value() const noexcept { return _value; }
 
 std::ostream& operator<<(std::ostream& out, const bencode_element& elem) {
 	if (elem.get_type() == 0) {
-		out << std::get<bencode_element::int_type>(elem.get_value());
+		out << std::get<int_type>(elem.get_value());
 	}
 	else if (elem.get_type() == 1) {
-		out << std::get<bencode_element::string_type>(elem.get_value());
+		out << std::get<ustring_type>(elem.get_value());
 	}
 	else if (elem.get_type() == 2) {
-		out << std::get<bencode_element::list_type>(elem.get_value());
+		out << std::get<list_type>(elem.get_value());
 	}
 	else if (elem.get_type() == 3) {
-		out << std::get<bencode_element::dict_type>(elem.get_value());
+		out << std::get<dict_type>(elem.get_value());
 	}
 	return out;
 }
 
-std::ostream& operator<<(std::ostream& out, const bencode_element::string_type& string) {
+std::ostream& operator<<(std::ostream& out, const ustring_type& string) {
 	for (auto& it : string) {
 		out << it;
 	}
 	return out;
 }
 
-
-std::ostream& operator<<(std::ostream& out, const bencode_element::list_type& list) {
+std::ostream& operator<<(std::ostream& out, const list_type& list) {
 	out << "[";
 	for (auto& it : list) {
-		out << it << ", ";
+		out << it << ",";
 	}
 	out << "]";
 	return out;
 }
 
-std::ostream& operator<<(std::ostream& out, const bencode_element::dict_type& dict) {
-	out << "{";
+std::ostream& operator<<(std::ostream& out, const dict_type& dict) {
+	out << "\n\t{\n";
 	for (auto& it : dict) {
-		out << it.first << ": " << it.second << "; ";
+		out << "\t" << it.first << ": " << it.second << ",\n";
 	}
-	out << "}";
+	out << "\n\t}";
 	return out;
 }
 
-bencode_element get_int(bencode_element::string_type::const_iterator& it) {
+bencode_element get_int(ustring_type::const_iterator& it) {
 	const auto start = it;
 	while (*it != 'e') {  // int value has end symbol 'e'
 		++it;
@@ -63,14 +62,14 @@ bencode_element get_int(bencode_element::string_type::const_iterator& it) {
 	return bencode_element(std::stoi(std::string(start, it)));  // it on 'e'
 }
 
-bencode_element get_string(bencode_element::string_type::const_iterator& it) {
+bencode_element get_string(ustring_type::const_iterator& it) {
 	const auto start_len = it;
 	while (*it != ':') {
 		++it;
 	}
 	size_t len = std::stoull(std::string(start_len, it));  // it on ':'
 	if (len == 0) {
-		return bencode_element(bencode_element::string_type());
+		return bencode_element(ustring_type());
 	}
 
 	++it;
@@ -79,17 +78,17 @@ bencode_element get_string(bencode_element::string_type::const_iterator& it) {
 	for (size_t i = 0; i < len - 1; ++i) {
 		++it;
 	}
-	return bencode_element(bencode_element::string_type(start_value, it + 1));  // since right border not included
+	return bencode_element(ustring_type(start_value, it + 1));  // since right border not included
 }
 
-bencode_element get_bencode_element(bencode_element::string_type::const_iterator& it) {
+bencode_element get_bencode_element(ustring_type::const_iterator& it) {
 	if (*it == 'i') {  // integer
 		auto value = get_int(++it);
 		return value;
 	}
 	else if (*it == 'l') {  // list of different types
 		++it;
-		bencode_element::list_type list;
+		list_type list;
 		while (*it != 'e') {
 			list.push_back(get_bencode_element(it));
 			++it;
@@ -98,10 +97,10 @@ bencode_element get_bencode_element(bencode_element::string_type::const_iterator
 	}
 	else if (*it == 'd') {  // dictionary with key - const string, value - any bencode type"
 		++it;
-		bencode_element::dict_type dict;
+		dict_type dict;
 		while (*it != 'e') {
-			const bencode_element::string_type key = 
-				std::get<bencode_element::string_type>(get_string(it).get_value());
+			const ustring_type key = 
+				std::get<ustring_type>(get_string(it).get_value());
 			++it;
 			bencode_element value = get_bencode_element(it);
 			++it;
@@ -117,8 +116,8 @@ bencode_element get_bencode_element(bencode_element::string_type::const_iterator
 		throw std::invalid_argument("Invalid input string!");
 }
 
-bencode_element::list_type read_bencode(const bencode_element::string_type& input) {
-	bencode_element::list_type bencode_elements;
+list_type read_bencode(const ustring_type& input) {
+	list_type bencode_elements;
 
 	for (auto it = input.begin(); it != input.end(); ++it) {
 		bencode_elements.push_back(get_bencode_element(it));
