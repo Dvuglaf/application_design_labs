@@ -29,6 +29,13 @@ std::ostream& operator<<(std::ostream& out, const bencode_element& elem) {
 	return out;
 }
 
+std::ostream& operator<<(std::ostream& out, const bencode_element::string_type& string) {
+	for (auto& it : string) {
+		out << it;
+	}
+	return out;
+}
+
 
 std::ostream& operator<<(std::ostream& out, const bencode_element::list_type& list) {
 	out << "[";
@@ -48,7 +55,7 @@ std::ostream& operator<<(std::ostream& out, const bencode_element::dict_type& di
 	return out;
 }
 
-bencode_element get_int(std::string::const_iterator& it) {
+bencode_element get_int(bencode_element::string_type::const_iterator& it) {
 	const auto start = it;
 	while (*it != 'e') {  // int value has end symbol 'e'
 		++it;
@@ -56,12 +63,15 @@ bencode_element get_int(std::string::const_iterator& it) {
 	return bencode_element(std::stoi(std::string(start, it)));  // it on 'e'
 }
 
-bencode_element get_string(std::string::const_iterator& it) {
+bencode_element get_string(bencode_element::string_type::const_iterator& it) {
 	const auto start_len = it;
 	while (*it != ':') {
 		++it;
 	}
 	size_t len = std::stoull(std::string(start_len, it));  // it on ':'
+	if (len == 0) {
+		return bencode_element(bencode_element::string_type());
+	}
 
 	++it;
 	const auto start_value = it;
@@ -69,10 +79,10 @@ bencode_element get_string(std::string::const_iterator& it) {
 	for (size_t i = 0; i < len - 1; ++i) {
 		++it;
 	}
-	return bencode_element(std::string(start_value, it + 1));  // since right border not included
+	return bencode_element(bencode_element::string_type(start_value, it + 1));  // since right border not included
 }
 
-bencode_element get_bencode_element(std::string::const_iterator& it) {
+bencode_element get_bencode_element(bencode_element::string_type::const_iterator& it) {
 	if (*it == 'i') {  // integer
 		auto value = get_int(++it);
 		return value;
@@ -107,7 +117,7 @@ bencode_element get_bencode_element(std::string::const_iterator& it) {
 		throw std::invalid_argument("Invalid input string!");
 }
 
-bencode_element::list_type read_bencode(const std::string& input) {
+bencode_element::list_type read_bencode(const bencode_element::string_type& input) {
 	bencode_element::list_type bencode_elements;
 
 	for (auto it = input.begin(); it != input.end(); ++it) {

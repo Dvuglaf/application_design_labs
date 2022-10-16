@@ -6,7 +6,9 @@
 
 // Lexicographic order of strings keys in map
 struct string_comparator {
-	bool operator()(const std::string& left, const std::string& right) const {
+	bool operator()(const std::basic_string<unsigned char>& left,
+		const std::basic_string<unsigned char>& right) const 
+	{
 		int result = left.compare(right);
 		return result < 0;
 	}
@@ -15,7 +17,7 @@ struct string_comparator {
 class bencode_element {
 public:
 	using int_type = int;
-	using string_type = std::string;
+	using string_type = std::basic_string<unsigned char>;
 	using list_type = std::vector<bencode_element>;
 	using dict_type = std::map<string_type, bencode_element, string_comparator>;
 
@@ -39,6 +41,7 @@ private:
 };
 
 std::ostream& operator<<(std::ostream&, const bencode_element&);
+std::ostream& operator<<(std::ostream&, const bencode_element::string_type&);
 std::ostream& operator<<(std::ostream&, const bencode_element::list_type&);
 std::ostream& operator<<(std::ostream&, const bencode_element::dict_type&);
 
@@ -47,8 +50,8 @@ std::ostream& operator<<(std::ostream&, const bencode_element::dict_type&);
 * since the iterator is located on the last character that belongs to this data type.
 */
 
-bencode_element get_int(std::string::const_iterator&);
-bencode_element get_string(std::string::const_iterator&);
-bencode_element get_bencode_element(std::string::const_iterator&);
+bencode_element get_int(bencode_element::string_type::const_iterator&);
+bencode_element get_string(bencode_element::string_type::const_iterator&);
+bencode_element get_bencode_element(bencode_element::string_type::const_iterator&);
 
-bencode_element::list_type read_bencode(const std::string&);
+bencode_element::list_type read_bencode(const bencode_element::string_type&);
