@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 
-add_executable(torrent torrent.cpp bencode.h "bencode.cpp")
+add_executable(torrent torrent.cpp bencode.h bencode.cpp)
 
 if(WIN32)
 	target_link_libraries(torrent wsock32 ws2_32)
