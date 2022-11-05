@@ -263,7 +263,7 @@ void SHA1::read(std::istream &is, std::string &s, const int max)
     std::string sbuf;
     sbuf.resize(max);
     is.read(sbuf.data(), max);
-    s.assign(sbuf, is.gcount());
+    s.assign(sbuf.data(), is.gcount());
 }
 
 
