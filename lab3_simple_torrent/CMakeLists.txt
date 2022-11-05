@@ -16,5 +16,6 @@ include_directories(bencode)
 include_directories(sha1)
 #add_library(sha1 STATIC sha1/sha1.h sha1/sha1.cpp)
 
-add_executable(torrent torrent.cpp torrent_file_parser.h torrent_file_parser.cpp "sha1/sha1.h" "sha1/sha1.cpp" "bencode/BDictionary.cpp" "bencode/BDictionary.h" "bencode/bencoding.h" "bencode/BInteger.h" "bencode/BInteger.cpp" "bencode/BItem.h" "bencode/BItem.cpp" "bencode/BItemVisitor.h" "bencode/BItemVisitor.cpp" "bencode/BList.cpp" "bencode/BList.h" "bencode/BString.h" "bencode/BString.cpp" "bencode/Decoder.cpp" "bencode/Decoder.h" "bencode/Encoder.cpp" "bencode/Encoder.h" "bencode/PrettyPrinter.cpp" "bencode/PrettyPrinter.h" "bencode/Utils.h" "bencode/Utils.cpp" )
+add_executable(torrent torrent.cpp torrent_file.h torrent_file.cpp bencode.hpp "sha1/sha1.h" "sha1/sha1.cpp" "socket.cpp" "socket.h")
 target_link_libraries(torrent PRIVATE cpr::cpr)
+target_link_libraries(torrent PRIVATE wsock32 ws2_32)
