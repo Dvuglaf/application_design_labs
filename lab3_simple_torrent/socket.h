@@ -110,6 +110,20 @@ public:
 	*/
 	void shutdown(u_short type) const;
 
+	/*
+	* Set socket to blocking mode (socket wait until recv return non-zero or remote host close connection).
+	*/
+	void set_blocking_mode() const;
+
+	/*
+	* Set socket to non-blocking mode (if no data in buffer socket does not wait and return zero).
+	*/
+	void set_nonblocking_mode() const;
+
+private:
+	void set_socket_mode(bool block) const;
+
+
 public:
 	SOCKET _socket;
 	static WSADATA _wsa;

@@ -91,9 +91,11 @@ int socket_wrapper::send(const char* buffer, int size) const {
 
 int socket_wrapper::recv(char* buffer, int size) const {
 	int result = ::recv(_socket, buffer, size, 0);
-	if (result < 0)
+	if (result < 0) {
+		if (WSAGetLastError() == WSAEWOULDBLOCK)
+			return 0;
 		throw std::runtime_error(std::string("recv function failed with error ") + std::to_string(WSAGetLastError()));
-
+	}
 	return result;
 }
 
@@ -102,7 +104,22 @@ void socket_wrapper::shutdown(u_short type) const {
 	if (result == SOCKET_ERROR)
 		throw std::runtime_error(std::string("shutdown function failed with error ") + std::to_string(WSAGetLastError()));
 }
-	
+
+void socket_wrapper::set_blocking_mode() const {
+	set_socket_mode(false);
+}
+
+void socket_wrapper::set_nonblocking_mode() const {
+	set_socket_mode(true);
+}
+
+void socket_wrapper::set_socket_mode(bool nonblock) const {
+	unsigned long mode = static_cast<unsigned long>(nonblock);
+	const int result = ioctlsocket(_socket, FIONBIO, &mode);
+	if (result != NO_ERROR)
+		throw std::runtime_error(std::string("ioctlsocket failed with error ") + std::to_string(result));
+}
+
 socket_wrapper::~socket_wrapper() {
 	if (_socket != INVALID_SOCKET) {
 		const int close_result = ::closesocket(_socket);
