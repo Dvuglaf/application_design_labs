@@ -15,17 +15,19 @@
 #include <memory>
 #include <limits>
 #include "sha1/sha1.h"
+#include <type_traits>
+#include <cstdint>
 
-std::string hexDecode(const std::string& value) {
-	size_t hashLength = value.length();
-	std::string decodedHexString;
-	for (size_t i = 0; i < hashLength; i += 2)
+std::string hex_decode(const std::string& value) {
+	size_t hash_length = value.length();
+	std::string decoded_hex_string;
+	for (size_t i = 0; i < hash_length; i += 2)
 	{
 		std::string byte = value.substr(i, 2);
-		char c = (char)(int)strtol(byte.c_str(), nullptr, 16);
-		decodedHexString.push_back(c);
+		char c = (char)strtol(byte.c_str(), nullptr, 16);
+		decoded_hex_string.push_back(c);
 	}
-	return decodedHexString;
+	return decoded_hex_string;
 }
 
 std::string receive_via_socket(const socket_wrapper& slave_socket) {
@@ -34,7 +36,7 @@ std::string receive_via_socket(const socket_wrapper& slave_socket) {
 	try {
 		do {
 			char received[8192];
-			received_bytes = slave_socket.recv(received, 8192, 0, 100000);
+			received_bytes = slave_socket.recv(received, 8192, 0, 500000);
 
 			for (size_t i = 0; i < received_bytes; ++i)
 				received_buffer.push_back(received[i]);
@@ -47,11 +49,7 @@ std::string receive_via_socket(const socket_wrapper& slave_socket) {
 	return received_buffer;
 }
 
-inline constexpr unsigned char operator "" _u(char arg) noexcept {
-	return static_cast<unsigned char>(arg);
-}
-
-class wrong_connection : public std::runtime_error {
+class wrong_connection : public std::runtime_error {  // for socket's connection errors
 public: 
 	explicit wrong_connection(const std::string& what_arg) : std::runtime_error(what_arg), _msg(what_arg) { ; }
 	explicit wrong_connection(const char* what_arg) : std::runtime_error(what_arg), _msg(what_arg) { ; }
@@ -85,12 +83,11 @@ public:
 	bit_message(const int id, const std::string& payload = "") : id(id), payload(payload) { ; }
 
 	std::string create_message(const unsigned int length) {
-		unsigned long message_length = htonl(length);
-		//unsigned long message_id = htonl(id);
+		auto message_length = htonl(length);
 
 		char temp[5];
 
-		std::memcpy(temp, &message_length, sizeof(unsigned int));
+		std::memcpy(temp, &message_length, sizeof(message_length));
 		std::memcpy(temp + 4, &id, sizeof(char));
 		std::string buffer;
 		for (int i = 0; i < 5; ++i)
@@ -127,8 +124,8 @@ public:
 	void set_status(const std::string& new_status) { status = new_status; }
 
 	std::string perform_handshake(const std::string& handshake_message) const {
-		connect_socket.connect(address_family::IPV4, port, ip);
-//		connect_socket.set_nonblocking_mode();
+		if (!connect_socket.is_connected())
+			connect_socket.connect(address_family::IPV4, port, ip);
 
 		connect_socket.send(handshake_message.c_str(), static_cast<int>(handshake_message.size()));
 
@@ -144,7 +141,7 @@ public:
 		for (size_t i = 0; i < 8; ++i)
 			reserved.push_back('\0');
 		buffer << reserved;
-		buffer << hexDecode(params.info_hash);
+		buffer << hex_decode(params.info_hash);
 		buffer << params.client_id;
 		assert(buffer.str().length() == protocol.length() + 49);
 		return buffer.str();
@@ -152,21 +149,21 @@ public:
 	
 	static void check_hash(const std::string& answer, const std::string& info_hash) {
 		/*
-		 * len_protocol(2B) + protocol(19B) + reserved(8B) + info_hash(20B) + peer_id(20B)
+		 * answer: len_protocol(2B) + protocol(19B) + reserved(8B) + info_hash(20B) + peer_id(20B)
 		 */
 		std::string peer_hash = answer.substr(28, 20);
-		std::string returned = hexDecode(info_hash);
-		if (peer_hash != returned)
+		std::string file_hash = hex_decode(info_hash);
+		if (peer_hash != file_hash)
 			throw std::runtime_error("Hashes mismatch");
 	}
 
 	void establish_peer_connection(const std::string& info_hash, const std::string& client_id) {
-		const auto handshake_msg = create_handshake_message({ info_hash, client_id });
+		const std::string handshake_msg = create_handshake_message({ info_hash, client_id });
 		try {
 			std::string handshake_answer = perform_handshake(handshake_msg);
 
 			if (handshake_answer.empty())
-				throw wrong_connection("Can't connect to peer with ip [" + ip + "].");
+				throw wrong_connection("Handshake failed with peer with ip [" + ip + "].");
 
 			try {
 				check_hash(handshake_answer, info_hash);
@@ -177,15 +174,13 @@ public:
 
 			status = "handshaked";
 
-//			std::cout << "peer[" << ip << "] handshaked\n";
-
 			update_bitfield(handshake_answer.substr(68));
 		}
 		catch (std::runtime_error& e) {
 			status = "";
 
 			if (std::string(e.what()).find("10060") != std::string::npos) {
-				throw wrong_connection("Can't connect to peer with ip [" + get_ip() + "].");
+				throw wrong_connection("Can't connect to peer with ip [" + ip + "].");
 			}
 			else
 				throw;
@@ -361,7 +356,7 @@ public:
 					bit_message message(bit_message::unchoke);
 					if (p->get_status() != "unchoked") {
 						message = p->receive_message();
-						std::cout << "peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
+//						std::cout << "peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
 					}
 
 //					mutex.lock();
@@ -369,10 +364,12 @@ public:
 //					mutex.unlock();
 
 					if (message.get_id() == bit_message::keep_alive) {
+						--active_peers;
 						continue;
 					}
 
 					if (message.get_id() == bit_message::choke) {
+						--active_peers;
 						continue;
 					}
 					else if (message.get_id() == bit_message::unchoke) {
@@ -382,14 +379,14 @@ public:
 					}
 					else if (message.get_id() == bit_message::piece) {
 						std::string data = message.get_payload().substr(8);  // index + begin + data
-						if (hexDecode(sha1(data)) != pieces[index].hash) {
+						if (hex_decode(sha1(data)) != pieces[index].hash) {
 							mutex.lock();
 							set_piece_status(index, "not downloaded");
-							std::cout << "Piece[" << std::to_string(index) << "] hash mismatch!\n";
+//							std::cout << "Piece[" << std::to_string(index) << "] hash mismatch!\n";
 							mutex.unlock();
 						}
 						else {
-							std::cout << "peer[" << p->get_ip() << "] download [" << index << "] piece\n";
+//							std::cout << "peer[" << p->get_ip() << "] download [" << index << "] piece\n";
 							p->set_status("received piece");
 
 							set_piece_status(index, "downloaded");
@@ -402,6 +399,7 @@ public:
 							}
 						}
 					}
+					++active_peers;
 					mutex.lock();
 					index = get_next_download_index(p);
 					mutex.unlock();
@@ -411,7 +409,7 @@ public:
 					}
 					p->request_piece(index, piece_length, pieces.size(), file_size);
 					p->set_status("requested piece");
-					std::cout << "peer[" << p->get_ip() << "] request [" << std::to_string(index) << "]\n";
+//					std::cout << "peer[" << p->get_ip() << "] request [" << std::to_string(index) << "]\n";
 				}
 
 			}
@@ -428,7 +426,19 @@ public:
 		}
 	}
 
+	int get_active_peers() {
+		int num = 0;
+		for (auto p : peers) {
+			if (p->get_status() == "requested piece")
+				++num;
+		}
+		return num;
+	}
+
 	void download_pieces(const std::string& info_hash, const std::string& client_id) {
+		time_t start_time = std::time(nullptr);
+		time_t current_time = std::time(nullptr);
+		double diff = std::difftime(current_time, start_time);
 		for (size_t i = 0; i < std::min<size_t>(std::thread::hardware_concurrency(), peers.size()); ++i) {
 			std::thread peer_thread(
 				&piece_manager::peer_thread, this, std::cref(peers[i]), std::cref(info_hash), std::cref(client_id)
@@ -436,23 +446,36 @@ public:
 			peer_thread.detach();
 		}
 		while (!is_complete.load()) {
-			std::cout << "downloaded " << std::to_string(piece_downloaded) << "\n";
+			current_time = std::time(nullptr);
+			diff = std::difftime(current_time, start_time);
+			std::cout << "peers [" << get_active_peers() << "/" << peers.size() << "]"
+					  << " downloading [" << std::to_string(piece_downloaded) << "/" << pieces.size() << "] "
+					  << (float)piece_downloaded / pieces.size() * 100. << std::setprecision(4) << "% in " << diff << "s\r";
 			using namespace std::chrono_literals;
-			std::this_thread::sleep_for(10000ms);
+			std::this_thread::sleep_for(1000ms);
 		}
+
+		current_time = std::time(nullptr);
+		diff = std::difftime(current_time, start_time);
+		std::cout << "peers [" << get_active_peers() << "/" << peers.size() << "]"
+				  << "downloading [" << std::to_string(piece_downloaded) << "/" << pieces.size() << "] "
+				  << (float)piece_downloaded / pieces.size() * 100. << std::setprecision(4) << "% in " << diff << "s\n";
+
+		std::cout << "creating files...\n";
+
 		std::string buffer;
 		for (size_t i = 0; i < pieces.size(); ++i) {
 			buffer += pieces[i].data;
 		}
-		std::string filename = "C:\\Users\\meshc\\Downloads\\ComputerNetworks_own.txt";
+		std::string filename = "C:\\Users\\aizee\\Downloads\\ComputerNetworks_own.txt";
 		std::ofstream out;          // поток для записи
 		out.open(filename, std::ios::binary); // окрываем файл для записи
 		if (out.is_open())
 		{
 			out << buffer << std::endl;
 		}
-
 		out.close();
+		std::cout << "finish\n";
 	}
 
 
@@ -467,7 +490,8 @@ private:
 	std::vector<piece> pieces;
 	size_t piece_length;
 	size_t file_size;
-
+	
+	std::atomic<size_t> active_peers = 0;
 	std::atomic<size_t> piece_downloaded = 0;
 	std::atomic<bool> is_complete = false;
 	std::mutex mutex;
@@ -516,10 +540,10 @@ private:
 		return peer_id;
 	}
 
-	std::string get_peers_request(const request_params& params) {
+	std::string get_peers_request(request_params& params) {
 		cpr::Response res = cpr::Get(cpr::Url{ params.url }, cpr::Parameters{
-					{ "info_hash", hexDecode(params.info_hash) },
-					{ "peer_id", std::string(params.client_id) },
+					{ "info_hash", hex_decode(params.info_hash) },
+					{ "peer_id", params.client_id },
 					{ "port", std::to_string(params.port) },
 					{ "uploaded", std::to_string(params.uploaded) },
 					{ "downloaded", std::to_string(params.downloaded) },
@@ -534,8 +558,9 @@ private:
 		try {
 			const auto announce_url = file.get_announce();
 			const auto info_hash = file.get_info_hash();
-			const auto tracker_response = get_peers_request({ announce_url, id, info_hash,
-				0ull, 0ull, file.get_file_size(), 6881});
+			request_params params{announce_url, id, info_hash,
+				0ull, 0ull, file.get_file_size(), 6881};
+			const auto tracker_response = get_peers_request(params);
 			const auto response_dict = std::get<bencode::dict>(bencode::decode(tracker_response));
 
 			bencode::list peers_list = std::get<bencode::list>(response_dict->find("peers")->second);
@@ -566,7 +591,8 @@ private:
 
 
 int main() {
-	const std::string path = "C:\\Users\\meshc\\Downloads\\ComputerNetworks.torrent";
+	std::cout << std::is_same_v<long, int>;
+	const std::string path = "C:\\Users\\aizee\\Downloads\\ComputerNetworks.torrent";
 	client cl(path);
 	cl.start_download();
 }
