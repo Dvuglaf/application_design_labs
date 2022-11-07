@@ -17,12 +17,11 @@
 #include "sha1/sha1.h"
 
 std::string hexDecode(const std::string& value) {
-	int hashLength = value.length();
+	size_t hashLength = value.length();
 	std::string decodedHexString;
-	for (int i = 0; i < hashLength; i += 2)
+	for (size_t i = 0; i < hashLength; i += 2)
 	{
 		std::string byte = value.substr(i, 2);
-		unsigned char z = (unsigned char)(int)strtol(byte.c_str(), nullptr, 16);
 		char c = (char)(int)strtol(byte.c_str(), nullptr, 16);
 		decodedHexString.push_back(c);
 	}
@@ -34,10 +33,8 @@ std::string receive_via_socket(const socket_wrapper& slave_socket) {
 	std::string received_buffer;
 	try {
 		do {
-			using namespace std::chrono_literals;
-			std::this_thread::sleep_for(2000ms);
 			char received[8192];
-			received_bytes = slave_socket.recv(received, 8192);
+			received_bytes = slave_socket.recv(received, 8192, 5);
 
 			for (size_t i = 0; i < received_bytes; ++i)
 				received_buffer.push_back(received[i]);
@@ -131,10 +128,9 @@ public:
 
 	std::string perform_handshake(const std::string& handshake_message) const {
 		connect_socket.connect(address_family::IPV4, port, ip);
-		connect_socket.set_nonblocking_mode();
+//		connect_socket.set_nonblocking_mode();
 
-		const int bytes_sent_size = connect_socket.send(handshake_message.c_str(),
-			static_cast<int>(handshake_message.size()));
+		connect_socket.send(handshake_message.c_str(), static_cast<int>(handshake_message.size()));
 
 		return receive_via_socket(connect_socket);
 	}
@@ -181,7 +177,7 @@ public:
 
 			status = "handshaked";
 
-			std::cout << "peer[" << ip << "] handshaked\n";
+//			std::cout << "peer[" << ip << "] handshaked\n";
 
 			update_bitfield(handshake_answer.substr(68));
 		}
@@ -211,12 +207,12 @@ public:
 		}
 
 		int message_id = int(answer.substr(4, 1)[0]);
-		std::string payload = answer.substr(5, length - 1);
+		std::string payload = answer.substr(5, length - 1u);
 
 		messages.push_back(bit_message(bit_message::message_id(message_id), payload));
 
 		// Get 'have' messages (id = 4) if exists
-		for (size_t i = 4 + length + 5; i < answer.size(); i += 9) {
+		for (size_t i = 4u + length + 5u; i < answer.size(); i += 9) {
 			message_id = int(answer.substr(i - 1, 1)[0]);
 			payload = answer.substr(i, 4);
 			messages.push_back(bit_message(bit_message::message_id(message_id), payload));
@@ -234,16 +230,16 @@ public:
 
 		for (size_t i = 1; i < messages.size(); ++i) {  // go through 'have' messages and update transformed_bit_field 
 			if (messages[i].get_id() == bit_message::have) {
-				unsigned int index = 0;
+				size_t index = 0;
 				std::string payload = messages[i].get_payload();
 				for (size_t j = 0; j < 4; ++j) {
 					index += int((payload[3 - j] + 256) % 256) * int(std::pow(256, j));
 				}
 				transformed_bitfield[index] = '1';
 			}
-			else if (messages[i].get_id() == bit_message::unchoke) {  // if peer send 'unchoke' after 'have' messages before 'interested'
-				set_status("unchoked");
-			}
+			//else if (messages[i].get_id() == bit_message::unchoke) {  // if peer send 'unchoke' after 'have' messages before 'interested'
+				//set_status("unchoked");
+			//}
 		}
 
 		return transformed_bitfield;
@@ -263,8 +259,7 @@ public:
 	void send_interested() {
 		std::string message = bit_message(bit_message::interested).create_message(1u);
 
-		const int bytes_sent_size = connect_socket.send(message.c_str(),
-			static_cast<int>(message.size()));
+		connect_socket.send(message.c_str(), static_cast<int>(message.size()));
 	}
 
 	bit_message receive_message() const {
@@ -275,13 +270,13 @@ public:
 		}
 
 		std::string length_str = answer.substr(0, 4);
-		unsigned int length = 0;
+		size_t length = 0;
 		for (size_t i = 0; i < 4; ++i) {
 			length += int(length_str[3 - i]) * int(std::pow(256, i));
 		}
 
 		int message_id = int(answer.substr(4, 1)[0]);
-		std::string payload = answer.substr(5, length - 1);
+		std::string payload = answer.substr(5, length - 1u);
 
 		return bit_message(message_id, payload);
 	}
@@ -301,8 +296,7 @@ public:
 			payload += (char)temp[i];
 
 		std::string request = bit_message(bit_message::request, payload).create_message(13);
-		const int bytes_sent_size = connect_socket.send(request.c_str(),
-			static_cast<int>(request.size()));
+		connect_socket.send(request.c_str(), static_cast<int>(request.size()));
 	}
 
 	struct hash {
@@ -323,7 +317,7 @@ private:
 
 class piece_manager {
 public:
-	piece_manager(const std::vector<std::string>& hashes, const unsigned int piece_length) 
+	piece_manager(const std::vector<std::string>& hashes, const size_t piece_length) 
 		: piece_length(piece_length), piece_downloaded(0) {
 		for (size_t i = 0; i < hashes.size(); ++i) {
 			pieces.push_back({ "", hashes[i], "not downloaded" });
@@ -334,18 +328,18 @@ public:
 		peers.push_back(p);
 	}
 
-	unsigned int get_next_download_index(const std::shared_ptr<peer>& p) {
-		for (unsigned int i = 0; i < pieces.size(); ++i) {
+	size_t get_next_download_index(const std::shared_ptr<peer>& p) {
+		for (size_t i = 0; i < pieces.size(); ++i) {
 			if ((pieces[i].status == "not downloaded") && p->get_bitfield()[i] == '1') {
 				set_piece_status(i, "downloading");
 				return i;
 			}
 		}
 
-		return UINT_MAX;
+		return ULLONG_MAX;
 	}
 
-	void set_piece_status(const unsigned int index, const std::string& new_status) {
+	void set_piece_status(const size_t index, const std::string& new_status) {
 		pieces[index].status = new_status;
 	}
 
@@ -353,20 +347,22 @@ public:
 		while (!is_complete.load()) {
 			try {
 				p->establish_peer_connection(info_hash, client_id);
-				std::cout << "peer[" << p->get_ip() << "] status[" << p->get_status() << "]\n";
+//				std::cout << "peer[" << p->get_ip() << "] status[" << p->get_status() << "]\n";
 
-				if (p->get_status() != "unchoked")
-					p->send_interested();
+//				if (p->get_status() != "unchoked")
+				p->send_interested();
 				
-				unsigned int index = UINT_MAX;
+				size_t index = ULLONG_MAX;
 				while (!is_complete.load()) {
 					bit_message message(bit_message::unchoke);
-					if (p->get_status() != "unchoked")
+					if (p->get_status() != "unchoked") {
 						message = p->receive_message();
+						std::cout << "HERE!peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
+					}
 
-					mutex.lock();
-					std::cout << "peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
-					mutex.unlock();
+//					mutex.lock();
+//					std::cout << "peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
+//					mutex.unlock();
 
 					if (message.get_id() == bit_message::keep_alive) {
 						continue;
@@ -376,7 +372,7 @@ public:
 						continue;
 					}
 					else if (message.get_id() == bit_message::unchoke) {
-						std::cout << "peer[" << p->get_ip() << "] unchoked\n";
+//						std::cout << "peer[" << p->get_ip() << "] unchoked\n";
 
 						p->set_status("unchoked");
 					}
@@ -385,22 +381,21 @@ public:
 						if (hexDecode(sha1(data)) != pieces[index].hash) {
 							mutex.lock();
 							set_piece_status(index, "not downloaded");
+							std::cout << "Piece[" << std::to_string(index) << "] hash mismatch!\n";
 							mutex.unlock();
 						}
 						else {
 							std::cout << "peer[" << p->get_ip() << "] download [" << index << "] piece\n";
 							p->set_status("received piece");
-							mutex.lock();
+
 							set_piece_status(index, "downloaded");
 							++piece_downloaded;
 							pieces[index].data = data;
-							mutex.unlock();
 
-							if (piece_downloaded == pieces.size()) {
+							if (piece_downloaded.load() == pieces.size()) {
 								is_complete.store(true);
 								return;
 							}
-
 						}
 					}
 					mutex.lock();
@@ -413,7 +408,6 @@ public:
 					p->request_piece(index, piece_length);
 					p->set_status("requested piece");
 					std::cout << "peer[" << p->get_ip() << "] request [" << std::to_string(index) << "]\n";
-
 				}
 
 			}
@@ -431,19 +425,29 @@ public:
 	}
 
 	void download_pieces(const std::string& info_hash, const std::string& client_id) {
-		for (size_t i = 0; i < std::min<unsigned int>(std::thread::hardware_concurrency(), peers.size()); ++i) {
+		for (size_t i = 0; i < std::min<size_t>(std::thread::hardware_concurrency(), peers.size()); ++i) {
 			std::thread peer_thread(
 				&piece_manager::peer_thread, this, std::cref(peers[i]), std::cref(info_hash), std::cref(client_id)
 			);
 			peer_thread.detach();
 		}
 		while (!is_complete.load()) {
-			mutex.lock();
 			std::cout << "downloaded " << std::to_string(piece_downloaded) << "\n";
-			mutex.unlock();
 			using namespace std::chrono_literals;
 			std::this_thread::sleep_for(10000ms);
 		}
+		std::string buffer;
+		for (size_t i = 0; i < pieces.size(); ++i) {
+			buffer += pieces[i].data;
+		}
+		std::ofstream out;          // поток для записи
+		out.open("C:\\Users\\aizee\\Downloads\\ComputerNetworks_own.txt"); // окрываем файл для записи
+		if (out.is_open())
+		{
+			out << buffer << std::endl;
+		}
+
+
 	}
 
 
@@ -456,9 +460,9 @@ private:
 private:
 	std::vector<std::shared_ptr<peer>> peers;  // peer: status
 	std::vector<piece> pieces;
-	unsigned int piece_downloaded;
-	unsigned int piece_length;
+	size_t piece_length;
 
+	std::atomic<size_t> piece_downloaded = 0;
 	std::atomic<bool> is_complete = false;
 	std::mutex mutex;
 };
