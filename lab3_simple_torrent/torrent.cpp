@@ -34,7 +34,7 @@ std::string receive_via_socket(const socket_wrapper& slave_socket) {
 	try {
 		do {
 			char received[8192];
-			received_bytes = slave_socket.recv(received, 8192, 5);
+			received_bytes = slave_socket.recv(received, 8192, 0, 100000);
 
 			for (size_t i = 0; i < received_bytes; ++i)
 				received_buffer.push_back(received[i]);
@@ -203,7 +203,7 @@ public:
 		std::string length_str = answer.substr(0, 4);
 		unsigned int length = 0;
 		for (size_t i = 0; i < 4; ++i) {
-			length += int(length_str[3 - i]) * int(std::pow(256, i));
+			length += int((length_str[3 - i] + 256) % 256) * int(std::pow(256, i));
 		}
 
 		int message_id = int(answer.substr(4, 1)[0]);
@@ -272,7 +272,7 @@ public:
 		std::string length_str = answer.substr(0, 4);
 		size_t length = 0;
 		for (size_t i = 0; i < 4; ++i) {
-			length += int(length_str[3 - i]) * int(std::pow(256, i));
+			length += int((length_str[3 - i] + 256) % 256) * int(std::pow(256, i));
 		}
 
 		int message_id = int(answer.substr(4, 1)[0]);
@@ -281,13 +281,18 @@ public:
 		return bit_message(message_id, payload);
 	}
 
-	void request_piece(const unsigned int piece_index, const unsigned int piece_length) const {
+	void request_piece(const unsigned int piece_index, const unsigned int piece_length, const unsigned int piece_count, const unsigned int file_size) const {
 		char temp[12];
 
 		// Needs to convert little-endian to big-endian
 		unsigned int index = htonl(piece_index);
 		unsigned int offset = htonl(0u);
 		unsigned int length = htonl(piece_length);
+		if (piece_index == piece_count - 1) {
+			length = htonl(file_size % piece_length);
+			if (length == htonl(0))
+				length = htonl(piece_length);
+		}
 		std::memcpy(temp, &index, sizeof(unsigned int));
 		std::memcpy(temp + 4, &offset, sizeof(unsigned int));
 		std::memcpy(temp + 8, &length, sizeof(unsigned int));
@@ -317,8 +322,8 @@ private:
 
 class piece_manager {
 public:
-	piece_manager(const std::vector<std::string>& hashes, const size_t piece_length) 
-		: piece_length(piece_length), piece_downloaded(0) {
+	piece_manager(const std::vector<std::string>& hashes, const size_t piece_length, const size_t file_size) 
+		: piece_length(piece_length), piece_downloaded(0), file_size(file_size) {
 		for (size_t i = 0; i < hashes.size(); ++i) {
 			pieces.push_back({ "", hashes[i], "not downloaded" });
 		}
@@ -329,7 +334,7 @@ public:
 	}
 
 	size_t get_next_download_index(const std::shared_ptr<peer>& p) {
-		for (size_t i = 0; i < pieces.size(); ++i) {
+		for (int i = pieces.size() - 1; i >= 0; --i) {
 			if ((pieces[i].status == "not downloaded") && p->get_bitfield()[i] == '1') {
 				set_piece_status(i, "downloading");
 				return i;
@@ -349,7 +354,6 @@ public:
 				p->establish_peer_connection(info_hash, client_id);
 //				std::cout << "peer[" << p->get_ip() << "] status[" << p->get_status() << "]\n";
 
-//				if (p->get_status() != "unchoked")
 				p->send_interested();
 				
 				size_t index = ULLONG_MAX;
@@ -357,7 +361,7 @@ public:
 					bit_message message(bit_message::unchoke);
 					if (p->get_status() != "unchoked") {
 						message = p->receive_message();
-						std::cout << "HERE!peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
+						std::cout << "peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
 					}
 
 //					mutex.lock();
@@ -405,7 +409,7 @@ public:
 					if (index == ULLONG_MAX) {
 						continue;
 					}
-					p->request_piece(index, piece_length);
+					p->request_piece(index, piece_length, pieces.size(), file_size);
 					p->set_status("requested piece");
 					std::cout << "peer[" << p->get_ip() << "] request [" << std::to_string(index) << "]\n";
 				}
@@ -440,14 +444,15 @@ public:
 		for (size_t i = 0; i < pieces.size(); ++i) {
 			buffer += pieces[i].data;
 		}
+		std::string filename = "C:\\Users\\meshc\\Downloads\\ComputerNetworks_own.txt";
 		std::ofstream out;          // поток для записи
-		out.open("C:\\Users\\aizee\\Downloads\\ComputerNetworks_own.txt"); // окрываем файл для записи
+		out.open(filename, std::ios::binary); // окрываем файл для записи
 		if (out.is_open())
 		{
 			out << buffer << std::endl;
 		}
 
-
+		out.close();
 	}
 
 
@@ -461,6 +466,7 @@ private:
 	std::vector<std::shared_ptr<peer>> peers;  // peer: status
 	std::vector<piece> pieces;
 	size_t piece_length;
+	size_t file_size;
 
 	std::atomic<size_t> piece_downloaded = 0;
 	std::atomic<bool> is_complete = false;
@@ -474,7 +480,7 @@ public:
 	void start_download() {
 		try {
 			std::vector<std::shared_ptr<peer>> peers = get_peers();
-			piece_manager manager(file.split_piece_hashes(), file.get_piece_length());
+			piece_manager manager(file.split_piece_hashes(), file.get_piece_length(), file.get_file_size());
 			for (auto& p : peers) {
 				manager.add_peer(p);
 			}
@@ -560,13 +566,10 @@ private:
 
 
 int main() {
-	const std::string path = "C:\\Users\\aizee\\Downloads\\ComputerNetworks.torrent";
+	const std::string path = "C:\\Users\\meshc\\Downloads\\ComputerNetworks.torrent";
 	client cl(path);
 	cl.start_download();
 }
 
 /*
- * TODO: change sleep_for(...) to select.
- * TODO: index 0 not downloaded.
- * TODO: make file from pieces.
  */

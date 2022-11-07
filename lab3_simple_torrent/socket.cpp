@@ -89,7 +89,7 @@ int socket_wrapper::send(const char* buffer, int size) const {
 	return result;
 }
 
-int socket_wrapper::recv(char* buffer, int size, int timeout_sec) const {
+int socket_wrapper::recv(char* buffer, int size, int timeout_sec, int timeout_usec) const {
 	fd_set fds;
 	int n;
 	struct timeval tv;
@@ -100,11 +100,19 @@ int socket_wrapper::recv(char* buffer, int size, int timeout_sec) const {
 
 	// Set up the struct timeval for the timeout.
 	tv.tv_sec = timeout_sec;
-	tv.tv_usec = 0;
+	tv.tv_usec = timeout_usec;
 
 	// Wait until timeout or data received.
 	n = select(_socket, &fds, NULL, NULL, &tv);
+
+	/*int n;
+	WSAPOLLFD pollfd;
+	pollfd.fd = _socket;
+	pollfd.events = POLLIN;
+
+	n = WSAPoll(&pollfd, 1, timeout_msec);*/
 	if (n == 0) {  // timeout
+		/*throw std::runtime_error(std::string("socket receive finished with timeout"));*/
 		return 0;
 	}
 	else if (n == SOCKET_ERROR) {

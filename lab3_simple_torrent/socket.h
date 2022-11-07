@@ -98,11 +98,12 @@ public:
 	*
 	* @param buffer: a pointer to the buffer to receive the incoming data
 	* @param size: bytes to receive the incoming data
-	* @param timeout_sec: set timeout for recieve (or data receive or timeout)
+	* @param timeout_sec: set timeout (seconds) for recieve (or data receive or timeout)
+	* @param timeout_usec: set timeout (microseconds) for recieve (or data receive or timeout)
 	*
 	* @return the number of bytes received and the buffer pointed to by the buffer parameter will contain this data received
 	*/
-	int recv(char* buffer, int size, int timeout_sec) const;
+	int recv(char* buffer, int size, int timeout_sec, int timeout_usec) const;
 
 	/**
 	* The shutdown function disables both send and receive operations.
