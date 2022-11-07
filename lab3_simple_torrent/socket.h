@@ -122,6 +122,8 @@ public:
 	*/
 	void set_nonblocking_mode() const;
 
+	bool is_connected() const { return _socket != 0; }
+
 private:
 	void set_socket_mode(bool block) const;
 
