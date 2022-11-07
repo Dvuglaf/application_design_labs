@@ -402,7 +402,7 @@ public:
 					index = get_next_download_index(p);
 					mutex.unlock();
 
-					while (index == UINT_MAX) {
+					if (index == ULLONG_MAX) {
 						continue;
 					}
 					p->request_piece(index, piece_length);
