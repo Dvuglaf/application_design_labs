@@ -28,6 +28,17 @@ std::string hex_decode(const std::string& value) {
 	return decoded_hex_string;
 }
 
+template <typename T>
+T get_number_from_raw(const std::string& bytes) {  // bytes in reverse order (network order)
+	T number = 0;
+
+	for (size_t i = 0; i < bytes.size(); ++i) {
+		number += T((bytes[bytes.size() - 1 - i] + 256) % 256) * T(std::pow(256, i));  // reverse order from end to start
+	}
+
+	return number;
+}
+
 std::string receive_via_socket(const socket_wrapper& slave_socket) {
 	int received_bytes = 0;
 	std::string received_buffer;
@@ -47,22 +58,30 @@ std::string receive_via_socket(const socket_wrapper& slave_socket) {
 
 			if (received_bytes > 0) {
 
-				if (int(received_buffer[0]) == 19) // handshake message
-					break;
+				if (int(received_buffer[0]) == 19) {  // handshake
+					if (received_buffer.size() < 72)  // length of handshake message is 68 and bitfield length param is 4
+						continue;
+					else {
+						std::string length_str = received_buffer.substr(68, 4);
+						uint32_t length = get_number_from_raw<uint32_t>(length_str);
+
+						if (length == received_buffer.substr(72).size())
+							break;
+						else if (received_buffer.substr(72).size() > length)  // lazy bitfield (bitfield + having messages)
+							break;
+						else
+							continue;
+					}
+				}
 
 				if (received_bytes > 4) {
 
 					std::string length_str = received_buffer.substr(0, 4);
-					unsigned int length = 0;
-					for (size_t i = 0; i < 4; ++i) {
-						length += int((length_str[3 - i] + 256) % 256) * int(std::pow(256, i));
-					}
+					uint32_t length = get_number_from_raw<uint32_t>(length_str);
 
 					if (length == received_buffer.substr(4).size())  // read all data from peer reply
 						break;
-
 				}
-
 			}
 
 		} while (received_bytes > 0);
@@ -220,19 +239,15 @@ public:
 
 		// Get 'bitfield' (id = 5), always exists
 		std::string length_str = answer.substr(0, 4);
-		uint32_t length = 0;
-		for (size_t i = 0; i < 4; ++i) {
-			length += uint32_t((length_str[3 - i] + 256) % 256) * uint32_t(std::pow(256, i));
-		}
-
-		uint8_t message_id = uint8_t(answer.substr(4, 1)[0]);
+		uint32_t length = get_number_from_raw<uint32_t>(length_str);
+		uint8_t message_id = get_number_from_raw<uint8_t>(answer.substr(4, 1));
 		std::string payload = answer.substr(5u, length - 1u);
 
 		messages.push_back(bit_message(bit_message::message_id(message_id), payload));
 
 		// Get 'have' messages (id = 4) if exists
 		for (size_t i = 4u + length + 5u; i < answer.size(); i += 9) {
-			message_id = int(answer.substr(i - 1, 1)[0]);
+			message_id = get_number_from_raw<uint8_t>(answer.substr(i - 1, 1));
 			payload = answer.substr(i, 4);
 			messages.push_back(bit_message(bit_message::message_id(message_id), payload));
 		}
@@ -242,18 +257,15 @@ public:
 		std::string transformed_bitfield;
 
 		for (auto c : bitfield) {  // transform only bit_field
-			for (int i = 7; i >= 0; --i) {
+			for (int i = 7; i >= 0; --i) {  // from network order -> reverse
 				transformed_bitfield += std::to_string((int(c) & (1 << i)) >> i);
 			}
 		}
 
 		for (size_t i = 1; i < messages.size(); ++i) {  // go through 'have' messages and update transformed_bit_field 
 			if (messages[i].get_id() == bit_message::have) {
-				size_t index = 0;
+				size_t index = get_number_from_raw<size_t>(payload);
 				std::string payload = messages[i].get_payload();
-				for (size_t j = 0; j < 4; ++j) {
-					index += size_t((payload[3 - j] + 256) % 256) * size_t(std::pow(256, j));
-				}
 				transformed_bitfield[index] = '1';
 			}
 		}
@@ -289,12 +301,8 @@ public:
 		 */
 
 		std::string length_str = answer.substr(0, 4);
-		size_t length = 0;
-		for (size_t i = 0; i < 4; ++i) {
-			length += int((length_str[3 - i] + 256) % 256) * int(std::pow(256, i));
-		}
-
-		int8_t message_id = int8_t(answer.substr(4, 1)[0]);
+		uint32_t length = get_number_from_raw<uint32_t>(length_str);
+		int8_t message_id = get_number_from_raw<int8_t>(answer.substr(4, 1));
 		std::string payload = answer.substr(5, length - 1u);
 
 		return bit_message(bit_message::message_id(message_id), payload);
@@ -533,7 +541,6 @@ public:
 		}
 	}
 
-
 private:
 	struct request_params {
 		std::string url;
@@ -603,13 +610,13 @@ private:
 					ip += std::to_string(ntohs(peers_string[i + 2])) + ".";
 					ip += std::to_string(ntohs(peers_string[i + 3]));
 
-					std::string port;
-					port += std::to_string(ntohs(std::stoi(peers_string.substr(i + 4, 2))));
+					std::string port_data = peers_string.substr(i + 4, 2);
+					uint16_t port = get_number_from_raw<uint16_t>(port_data);
 
 					peers.push_back(std::make_shared<peer>(
 						id,
 						ip,
-						std::stoll(port),
+						port,
 						socket_wrapper(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP)
 						));
 				}
@@ -629,7 +636,7 @@ private:
 
 
 int main() {
-	const std::string path_to_torrent_file = "C:\\Users\\aizee\\Downloads\\ComputerNetworks.torrent";
+	const std::string path_to_torrent_file = "C:\\Users\\aizee\\Downloads\\MoralPsychHandbook.torrent";
 	torrent_client cl;
 	cl.start_download(path_to_torrent_file, "C:\\Users\\aizee\\OneDrive\\Desktop");
 }
