@@ -67,7 +67,7 @@ public:
 	* @param port: port
 	* @param ip: ip address
 	*/
-	void connect(u_short internet_protocol, u_short port, const std::string& ip) const;
+	void connect(u_short internet_protocol, u_short port, const std::string& ip);
 
 	/**
 	* The listen function places a socket in a state in which it is listening for an incoming connection.
@@ -122,15 +122,20 @@ public:
 	*/
 	void set_nonblocking_mode() const;
 
-	bool is_connected() const { return _socket != 0; }
+	/*
+	* Get true if socket is connected.
+	* 
+	* @return true if socket is connected, false - else
+	*/
+	bool is_connected() const { return _is_connected; }
 
 private:
 	void set_socket_mode(bool block) const;
 
-
-public:
+private:
 	SOCKET _socket;
 	static WSADATA _wsa;
 	static size_t _socket_count;
+	bool _is_connected = false;
 };
 #endif

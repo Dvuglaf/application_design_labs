@@ -52,7 +52,7 @@ void socket_wrapper::bind(u_short adress_family, u_short port, const std::string
 		throw std::runtime_error(std::string("bind function failed with error ") + std::to_string(WSAGetLastError()));
 }
 
-void socket_wrapper::connect(u_short adress_family, u_short port, const std::string& ip) const {
+void socket_wrapper::connect(u_short adress_family, u_short port, const std::string& ip) {
 	sockaddr_in socket_addr;
 
 	socket_addr.sin_family = adress_family;
@@ -62,6 +62,8 @@ void socket_wrapper::connect(u_short adress_family, u_short port, const std::str
 	const int result = ::connect(_socket, reinterpret_cast<SOCKADDR*>(&socket_addr), sizeof(socket_addr));
 	if (result == SOCKET_ERROR)
 		throw std::runtime_error(std::string("connect function failed with error ") + std::to_string(WSAGetLastError()));
+
+	_is_connected = true;
 }
 
 void socket_wrapper::listen(int max_connections) const {
@@ -105,19 +107,11 @@ int socket_wrapper::recv(char* buffer, int size, int timeout_sec, int timeout_us
 	// Wait until timeout or data received.
 	n = select(_socket, &fds, NULL, NULL, &tv);
 
-	/*int n;
-	WSAPOLLFD pollfd;
-	pollfd.fd = _socket;
-	pollfd.events = POLLIN;
-
-	n = WSAPoll(&pollfd, 1, timeout_msec);*/
-	if (n == 0) {  // timeout
-		/*throw std::runtime_error(std::string("socket receive finished with timeout"));*/
-		return 0;
-	}
-	else if (n == SOCKET_ERROR) {
+	if (n == 0)  // timeout
+		return -1;
+	else if (n == SOCKET_ERROR)
 		throw std::runtime_error(std::string("select function failed with error ") + std::to_string(WSAGetLastError()));
-	}
+
 	int result = ::recv(_socket, buffer, size, 0);
 	if (result < 0) {
 		if (WSAGetLastError() == WSAEWOULDBLOCK)
