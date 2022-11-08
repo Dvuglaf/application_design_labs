@@ -1,10 +1,8 @@
 ﻿#include <iostream>
 #include <string>
 #include <vector>
-#include <memory>
 #include <fstream>
 #include <random>
-#include <thread>
 #include <cpr/cpr.h>
 #include <iomanip>
 #include "bencode.hpp"
@@ -36,10 +34,36 @@ std::string receive_via_socket(const socket_wrapper& slave_socket) {
 	try {
 		do {
 			char received[8192];
-			received_bytes = slave_socket.recv(received, 8192, 0, 500000);
+
+			received_bytes = slave_socket.recv(received, 8192, 0, 10000);
+			
+			if (received_bytes == -1) {  // timeout - try again
+				received_bytes = 1;
+				continue;
+			}
 
 			for (size_t i = 0; i < received_bytes; ++i)
 				received_buffer.push_back(received[i]);
+
+			if (received_bytes > 0) {
+
+				if (int(received_buffer[0]) == 19) // handshake message
+					break;
+
+				if (received_bytes > 4) {
+
+					std::string length_str = received_buffer.substr(0, 4);
+					unsigned int length = 0;
+					for (size_t i = 0; i < 4; ++i) {
+						length += int((length_str[3 - i] + 256) % 256) * int(std::pow(256, i));
+					}
+
+					if (length == received_buffer.substr(4).size())  // read all data from peer reply
+						break;
+
+				}
+
+			}
 
 		} while (received_bytes > 0);
 	}
@@ -73,34 +97,31 @@ public:
 		have = 4,
 		bit_field = 5,
 		request = 6,
-		piece = 7,
-		cancel = 8,
-		port = 9
+		piece = 7
 	};
 
 public:
 	bit_message(const message_id id, const std::string& payload = "") : id(id), payload(payload) { ; }
-	bit_message(const int id, const std::string& payload = "") : id(id), payload(payload) { ; }
 
-	std::string create_message(const unsigned int length) {
+	static std::string create_message(const uint32_t length, const uint8_t id, const std::string& payload) {
 		auto message_length = htonl(length);
 
 		char temp[5];
 
 		std::memcpy(temp, &message_length, sizeof(message_length));
-		std::memcpy(temp + 4, &id, sizeof(char));
+		std::memcpy(temp + 4, &id, sizeof(id));
 		std::string buffer;
-		for (int i = 0; i < 5; ++i)
+		for (size_t i = 0; i < 5; ++i)
 			buffer += (char)temp[i];
 
 		return buffer + payload;
 	}
 
-	int get_id() const noexcept { return id; }
+	int8_t get_id() const noexcept { return id; }
 	std::string get_payload() const noexcept { return payload; }
 
 private:
-	int id;
+	int8_t id;
 	std::string payload;
 };
 
@@ -112,20 +133,18 @@ private:
 		std::string client_id;
 	};
 public:
-	peer(const std::string& id, const std::string& ip, const unsigned short port, socket_wrapper&& socket)
+	peer(const std::string& id, const std::string& ip, const uint16_t port, socket_wrapper&& socket)
 		: id(id), ip(ip), port(port), connect_socket(std::move(socket)), status("") {}
-
-	peer(const std::string& id, const std::string& ip, const unsigned long long port, socket_wrapper&& socket)
-		: id(id), ip(ip), port(static_cast<unsigned short>(port)), connect_socket(std::move(socket)), status("") {}
 
 	std::string get_ip() const { return ip; }
 	std::string get_bitfield() const { return bitfield; }
 	std::string get_status() const { return status; }
 	void set_status(const std::string& new_status) { status = new_status; }
 
-	std::string perform_handshake(const std::string& handshake_message) const {
-		if (!connect_socket.is_connected())
+	std::string perform_handshake(const std::string& handshake_message) {
+		if (!connect_socket.is_connected()) {
 			connect_socket.connect(address_family::IPV4, port, ip);
+		}
 
 		connect_socket.send(handshake_message.c_str(), static_cast<int>(handshake_message.size()));
 
@@ -133,6 +152,9 @@ public:
 	}
 
 	static std::string create_handshake_message(const handshake_params& params) {
+		/*
+		 * handshake: len_protocol(2B) + protocol(19B) + reserved(8B) + info_hash(20B) + peer_id(20B)
+		 */
 		const std::string protocol = "BitTorrent protocol";
 		std::stringstream buffer;
 		buffer << (char)19;
@@ -158,9 +180,9 @@ public:
 	}
 
 	void establish_peer_connection(const std::string& info_hash, const std::string& client_id) {
-		const std::string handshake_msg = create_handshake_message({ info_hash, client_id });
+		const std::string handshake_request = create_handshake_message({ info_hash, client_id });
 		try {
-			std::string handshake_answer = perform_handshake(handshake_msg);
+			std::string handshake_answer = perform_handshake(handshake_request);
 
 			if (handshake_answer.empty())
 				throw wrong_connection("Handshake failed with peer with ip [" + ip + "].");
@@ -189,20 +211,22 @@ public:
 
 	std::string get_bitfield(const std::string& answer) {
 		/*
-		 * length(4B) + msg_id(1B) + bitfield(until end)
+		 * general scheme: length(4B) + bitfield_msg_id(1B) + payload(length)
+		 * 
+		 * several peers:  length(4B) + msg_id(1B) + bitfield(length) + length(4B) + have_msg_id(1B) + payload(length) +  length(4B) + unchoke_msg_id(1B)
 		 */
 
 		std::vector<bit_message> messages;
 
 		// Get 'bitfield' (id = 5), always exists
 		std::string length_str = answer.substr(0, 4);
-		unsigned int length = 0;
+		uint32_t length = 0;
 		for (size_t i = 0; i < 4; ++i) {
-			length += int((length_str[3 - i] + 256) % 256) * int(std::pow(256, i));
+			length += uint32_t((length_str[3 - i] + 256) % 256) * uint32_t(std::pow(256, i));
 		}
 
-		int message_id = int(answer.substr(4, 1)[0]);
-		std::string payload = answer.substr(5, length - 1u);
+		uint8_t message_id = uint8_t(answer.substr(4, 1)[0]);
+		std::string payload = answer.substr(5u, length - 1u);
 
 		messages.push_back(bit_message(bit_message::message_id(message_id), payload));
 
@@ -228,13 +252,10 @@ public:
 				size_t index = 0;
 				std::string payload = messages[i].get_payload();
 				for (size_t j = 0; j < 4; ++j) {
-					index += int((payload[3 - j] + 256) % 256) * int(std::pow(256, j));
+					index += size_t((payload[3 - j] + 256) % 256) * size_t(std::pow(256, j));
 				}
 				transformed_bitfield[index] = '1';
 			}
-			//else if (messages[i].get_id() == bit_message::unchoke) {  // if peer send 'unchoke' after 'have' messages before 'interested'
-				//set_status("unchoked");
-			//}
 		}
 
 		return transformed_bitfield;
@@ -247,12 +268,11 @@ public:
 			std::string bitfield_answer = receive_via_socket(connect_socket);
 			bitfield = get_bitfield(bitfield_answer);
 		}
-		std::cout << "peer[" << ip << "] update bitfield\n";
 
 	}
 
 	void send_interested() {
-		std::string message = bit_message(bit_message::interested).create_message(1u);
+		std::string message = bit_message::create_message(1u, bit_message::interested, "");
 
 		connect_socket.send(message.c_str(), static_cast<int>(message.size()));
 	}
@@ -264,51 +284,53 @@ public:
 			return bit_message(bit_message::keep_alive);
 		}
 
+		/*
+		 * general scheme: length(4B) + msg_id(1B) + payload(length) 
+		 */
+
 		std::string length_str = answer.substr(0, 4);
 		size_t length = 0;
 		for (size_t i = 0; i < 4; ++i) {
 			length += int((length_str[3 - i] + 256) % 256) * int(std::pow(256, i));
 		}
 
-		int message_id = int(answer.substr(4, 1)[0]);
+		int8_t message_id = int8_t(answer.substr(4, 1)[0]);
 		std::string payload = answer.substr(5, length - 1u);
 
-		return bit_message(message_id, payload);
+		return bit_message(bit_message::message_id(message_id), payload);
 	}
 
-	void request_piece(const unsigned int piece_index, const unsigned int piece_length, const unsigned int piece_count, const unsigned int file_size) const {
+	void request_piece(const uint32_t piece_index, const uint32_t piece_length, 
+		const uint32_t piece_count, const uint64_t file_size) const 
+	{
 		char temp[12];
 
 		// Needs to convert little-endian to big-endian
-		unsigned int index = htonl(piece_index);
-		unsigned int offset = htonl(0u);
-		unsigned int length = htonl(piece_length);
+		auto index = htonl(piece_index);
+		auto offset = htonl(0u);
+		auto length = htonl(piece_length);
+
 		if (piece_index == piece_count - 1) {
-			length = htonl(file_size % piece_length);
-			if (length == htonl(0))
+			length = htonl(file_size % piece_length);  // size of last piece can be not equal to piece_length
+			if (length == htonl(0))  
 				length = htonl(piece_length);
 		}
-		std::memcpy(temp, &index, sizeof(unsigned int));
-		std::memcpy(temp + 4, &offset, sizeof(unsigned int));
-		std::memcpy(temp + 8, &length, sizeof(unsigned int));
+		std::memcpy(temp, &index, sizeof(index));
+		std::memcpy(temp + 4, &offset, sizeof(offset));
+		std::memcpy(temp + 8, &length, sizeof(length));
+
 		std::string payload;
-		for (int i = 0; i < 12; ++i)
+		for (size_t i = 0; i < 12; ++i)
 			payload += (char)temp[i];
 
-		std::string request = bit_message(bit_message::request, payload).create_message(13);
+		std::string request = bit_message::create_message(13u, bit_message::request, payload);
 		connect_socket.send(request.c_str(), static_cast<int>(request.size()));
 	}
-
-	struct hash {
-		const auto operator()(const std::shared_ptr<peer>& p) const {
-			return std::hash<std::string>{}(p->id);
-		}
-	};
 
 private:
 	std::string id;
 	std::string ip;
-	unsigned short port;
+	uint16_t port;
 	std::string bitfield = "";
 	socket_wrapper connect_socket;
 	std::string status;
@@ -317,8 +339,9 @@ private:
 
 class piece_manager {
 public:
-	piece_manager(const std::vector<std::string>& hashes, const size_t piece_length, const size_t file_size) 
-		: piece_length(piece_length), piece_downloaded(0), file_size(file_size) {
+	piece_manager(const std::vector<std::string>& hashes, const uint32_t piece_length, const uint64_t file_size) 
+		: piece_length(piece_length), file_size(file_size), piece_downloaded(0) 
+	{
 		for (size_t i = 0; i < hashes.size(); ++i) {
 			pieces.push_back({ "", hashes[i], "not downloaded" });
 		}
@@ -328,65 +351,55 @@ public:
 		peers.push_back(p);
 	}
 
-	size_t get_next_download_index(const std::shared_ptr<peer>& p) {
-		for (int i = pieces.size() - 1; i >= 0; --i) {
+	uint32_t get_next_download_index(const std::shared_ptr<peer>& p) {
+		mutex.lock();
+		for (uint32_t i = 0; i < pieces.size(); ++i) {
 			if ((pieces[i].status == "not downloaded") && p->get_bitfield()[i] == '1') {
 				set_piece_status(i, "downloading");
+				mutex.unlock();
 				return i;
 			}
 		}
 
-		return ULLONG_MAX;
+		mutex.unlock();
+		return ULONG_MAX;
 	}
 
 	void set_piece_status(const size_t index, const std::string& new_status) {
 		pieces[index].status = new_status;
 	}
 
-	void peer_thread(const std::shared_ptr<peer>& p, const std::string& info_hash, const std::string& client_id) {
+	void peer_download_pieces(const std::shared_ptr<peer>& p, const std::string& info_hash, const std::string& client_id) {
 		while (!is_complete.load()) {
 			try {
 				p->establish_peer_connection(info_hash, client_id);
-//				std::cout << "peer[" << p->get_ip() << "] status[" << p->get_status() << "]\n";
-
 				p->send_interested();
 				
-				size_t index = ULLONG_MAX;
+				uint32_t index = ULONG_MAX;
 				while (!is_complete.load()) {
-					bit_message message(bit_message::unchoke);
-					if (p->get_status() != "unchoked") {
-						message = p->receive_message();
-//						std::cout << "peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
-					}
 
-//					mutex.lock();
-//					std::cout << "peer[" << p->get_ip() << "] receive message[" << std::to_string(message.get_id()) << "]\n";
-//					mutex.unlock();
+					bit_message message = p->receive_message();
 
 					if (message.get_id() == bit_message::keep_alive) {
-						--active_peers;
+						p->set_status("keep alive");
+						p->send_interested();
 						continue;
 					}
 
 					if (message.get_id() == bit_message::choke) {
-						--active_peers;
 						continue;
 					}
 					else if (message.get_id() == bit_message::unchoke) {
-//						std::cout << "peer[" << p->get_ip() << "] unchoked\n";
-
-						p->set_status("unchoked");
+						p->set_status("unchoked");  // request piece
 					}
 					else if (message.get_id() == bit_message::piece) {
 						std::string data = message.get_payload().substr(8);  // index + begin + data
 						if (hex_decode(sha1(data)) != pieces[index].hash) {
 							mutex.lock();
 							set_piece_status(index, "not downloaded");
-//							std::cout << "Piece[" << std::to_string(index) << "] hash mismatch!\n";
 							mutex.unlock();
 						}
 						else {
-//							std::cout << "peer[" << p->get_ip() << "] download [" << index << "] piece\n";
 							p->set_status("received piece");
 
 							set_piece_status(index, "downloaded");
@@ -399,22 +412,18 @@ public:
 							}
 						}
 					}
-					++active_peers;
-					mutex.lock();
 					index = get_next_download_index(p);
-					mutex.unlock();
 
-					if (index == ULLONG_MAX) {
+					if (index == ULONG_MAX)
 						continue;
-					}
-					p->request_piece(index, piece_length, pieces.size(), file_size);
+					p->request_piece(index, piece_length, static_cast<uint32_t>(pieces.size()), file_size);
 					p->set_status("requested piece");
-//					std::cout << "peer[" << p->get_ip() << "] request [" << std::to_string(index) << "]\n";
 				}
 
 			}
 			catch (wrong_connection& e) {
 				std::cout << e.what() << std::endl;
+
 				using namespace std::chrono_literals;
 				std::this_thread::sleep_for(10000ms);
 				continue;
@@ -426,56 +435,48 @@ public:
 		}
 	}
 
-	int get_active_peers() {
-		int num = 0;
-		for (auto p : peers) {
+	uint32_t get_active_peers() {
+		uint32_t num = 0;
+		for (const auto& p : peers) {
 			if (p->get_status() == "requested piece")
 				++num;
 		}
 		return num;
 	}
 
-	void download_pieces(const std::string& info_hash, const std::string& client_id) {
+	std::string download_pieces(const std::string& info_hash, const std::string& client_id) {
 		time_t start_time = std::time(nullptr);
 		time_t current_time = std::time(nullptr);
 		double diff = std::difftime(current_time, start_time);
-		for (size_t i = 0; i < std::min<size_t>(std::thread::hardware_concurrency(), peers.size()); ++i) {
+
+		for (size_t i = 0; i < std::min<size_t>(std::thread::hardware_concurrency(), peers.size()); ++i) {  // create threads
 			std::thread peer_thread(
-				&piece_manager::peer_thread, this, std::cref(peers[i]), std::cref(info_hash), std::cref(client_id)
+				&piece_manager::peer_download_pieces, this, std::cref(peers[i]), std::cref(info_hash), std::cref(client_id)
 			);
 			peer_thread.detach();
 		}
+
 		while (!is_complete.load()) {
 			current_time = std::time(nullptr);
 			diff = std::difftime(current_time, start_time);
+
+			auto percent = (float)piece_downloaded / pieces.size() * 100.f;
+
 			std::cout << "peers [" << get_active_peers() << "/" << peers.size() << "]"
 					  << " downloading [" << std::to_string(piece_downloaded) << "/" << pieces.size() << "] "
-					  << (float)piece_downloaded / pieces.size() * 100. << std::setprecision(4) << "% in " << diff << "s\r";
+					  << percent << std::setprecision(percent < 10.f ? 3 : 4) << "% in " << diff << "s\r";
+
 			using namespace std::chrono_literals;
 			std::this_thread::sleep_for(1000ms);
 		}
+		std::cout << "\n";
 
-		current_time = std::time(nullptr);
-		diff = std::difftime(current_time, start_time);
-		std::cout << "peers [" << get_active_peers() << "/" << peers.size() << "]"
-				  << "downloading [" << std::to_string(piece_downloaded) << "/" << pieces.size() << "] "
-				  << (float)piece_downloaded / pieces.size() * 100. << std::setprecision(4) << "% in " << diff << "s\n";
-
-		std::cout << "creating files...\n";
-
-		std::string buffer;
+		std::string file_data;
 		for (size_t i = 0; i < pieces.size(); ++i) {
-			buffer += pieces[i].data;
+			file_data += pieces[i].data;
 		}
-		std::string filename = "C:\\Users\\aizee\\Downloads\\ComputerNetworks_own.txt";
-		std::ofstream out;          // поток для записи
-		out.open(filename, std::ios::binary); // окрываем файл для записи
-		if (out.is_open())
-		{
-			out << buffer << std::endl;
-		}
-		out.close();
-		std::cout << "finish\n";
+
+		return file_data;
 	}
 
 
@@ -488,27 +489,44 @@ private:
 private:
 	std::vector<std::shared_ptr<peer>> peers;  // peer: status
 	std::vector<piece> pieces;
-	size_t piece_length;
-	size_t file_size;
+	uint32_t piece_length;
+	uint64_t file_size;
 	
-	std::atomic<size_t> active_peers = 0;
-	std::atomic<size_t> piece_downloaded = 0;
+	std::atomic<uint32_t> piece_downloaded = 0;
 	std::atomic<bool> is_complete = false;
 	std::mutex mutex;
 };
 
-class client {
+class torrent_client {
 public:
-	client(const std::string& path_to_file) : id(generate_client_id()), file(path_to_file) { ; }
+	torrent_client() : id(generate_client_id()) {}
 
-	void start_download() {
+	void start_download(const std::string& path_to_file, const std::string& path_to_output_dir) {
 		try {
+			file.add_file(path_to_file);
+
 			std::vector<std::shared_ptr<peer>> peers = get_peers();
+			std::cout << "get [" << peers.size() << "] peers from tracker\n";
+
 			piece_manager manager(file.split_piece_hashes(), file.get_piece_length(), file.get_file_size());
 			for (auto& p : peers) {
 				manager.add_peer(p);
 			}
-			manager.download_pieces(file.get_info_hash(), id);
+
+			const std::string file_data = manager.download_pieces(file.get_info_hash(), id);
+			std::cout << "downloading finished\n";
+			std::cout << "saving to file...\n";
+
+			std::string full_path = path_to_output_dir + "\\" + file.get_file_name();
+			std::ofstream out;
+			out.open(full_path, std::ios::binary);
+			if (out.is_open())
+			{
+				out << file_data << std::endl;
+			}
+			out.close();
+
+			std::cout << "saved\n";
 		}
 		catch (std::exception& e) {
 			std::cout << e.what();
@@ -521,10 +539,10 @@ private:
 		std::string url;
 		std::string client_id;
 		std::string info_hash;
-		unsigned long long uploaded;
-		unsigned long long downloaded;
-		unsigned long long left;
-		unsigned short port;
+		uint64_t uploaded;
+		uint64_t downloaded;
+		uint64_t left;
+		uint16_t port;
 	};
 
 private:
@@ -563,18 +581,38 @@ private:
 			const auto tracker_response = get_peers_request(params);
 			const auto response_dict = std::get<bencode::dict>(bencode::decode(tracker_response));
 
-			bencode::list peers_list = std::get<bencode::list>(response_dict->find("peers")->second);
 			std::vector<std::shared_ptr<peer>> peers;
-			std::vector<std::string> peer_ips, peer_ids;
-			std::vector<unsigned short> peer_ports;
+			if (response_dict->find("peers")->second.index() == 2) {  // peers as bencoded data (list)
+				bencode::list peers_list = std::get<bencode::list>(response_dict->find("peers")->second);
 
-			for (auto& p : peers_list) {
-				peers.push_back(std::make_shared<peer>(
-					std::get<bencode::string>(std::get<bencode::dict>(p)->find("peer id")->second),
-					std::get<bencode::string>(std::get<bencode::dict>(p)->find("ip")->second),
-					std::get<bencode::integer>(std::get<bencode::dict>(p)->find("port")->second),
-					socket_wrapper(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP)
-				));
+				for (auto& p : peers_list) {
+					peers.push_back(std::make_shared<peer>(
+						std::get<bencode::string>(std::get<bencode::dict>(p)->find("peer id")->second),
+						std::get<bencode::string>(std::get<bencode::dict>(p)->find("ip")->second),
+						std::get<bencode::integer>(std::get<bencode::dict>(p)->find("port")->second),
+						socket_wrapper(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP)
+						));
+				}
+			}
+			else {  // peers are raw data
+				bencode::string peers_string = std::get<bencode::string>(response_dict->find("peers")->second);
+				for (size_t i = 0; i < peers_string.size(); i += 6) {
+					std::string ip;
+					ip += std::to_string(ntohs(peers_string[i])) + ".";
+					ip += std::to_string(ntohs(peers_string[i + 1])) + ".";
+					ip += std::to_string(ntohs(peers_string[i + 2])) + ".";
+					ip += std::to_string(ntohs(peers_string[i + 3]));
+
+					std::string port;
+					port += std::to_string(ntohs(std::stoi(peers_string.substr(i + 4, 2))));
+
+					peers.push_back(std::make_shared<peer>(
+						id,
+						ip,
+						std::stoll(port),
+						socket_wrapper(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP)
+						));
+				}
 			}
 			return peers;
 
@@ -591,11 +629,7 @@ private:
 
 
 int main() {
-	std::cout << std::is_same_v<long, int>;
-	const std::string path = "C:\\Users\\aizee\\Downloads\\ComputerNetworks.torrent";
-	client cl(path);
-	cl.start_download();
+	const std::string path_to_torrent_file = "C:\\Users\\aizee\\Downloads\\ComputerNetworks.torrent";
+	torrent_client cl;
+	cl.start_download(path_to_torrent_file, "C:\\Users\\aizee\\OneDrive\\Desktop");
 }
-
-/*
- */
