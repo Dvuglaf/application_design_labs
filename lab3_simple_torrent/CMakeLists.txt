@@ -9,12 +9,9 @@ FetchContent_MakeAvailable(cpr)
 
 # bencoding
 include_directories(bencode)
-#file(GLOB BENCODING_SRC "bencode/*.cpp" "bencode/*.h")
-#add_library(bencoding STATIC ${BENCODING_SRC})
 
 # sha1
 include_directories(sha1)
-#add_library(sha1 STATIC sha1/sha1.h sha1/sha1.cpp)
 
 add_executable(torrent torrent.cpp torrent_file.h torrent_file.cpp bencode.hpp "sha1/sha1.h" "sha1/sha1.cpp" "socket.cpp" "socket.h")
 target_link_libraries(torrent PRIVATE cpr::cpr)
