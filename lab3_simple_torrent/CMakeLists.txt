@@ -7,12 +7,10 @@ FetchContent_Declare(cpr GIT_REPOSITORY https://github.com/libcpr/cpr.git
                          GIT_TAG 871ed52d350214a034f6ef8a3b8f51c5ce1bd400) # The commit hash for 1.9.0. Replace with the latest from: https://github.com/libcpr/cpr/releases
 FetchContent_MakeAvailable(cpr)
 
-# bencoding
-include_directories(bencode)
+# utils
+include_directories(utils)
 
-# sha1
-include_directories(sha1)
-
-add_executable(torrent torrent.cpp torrent_file.h torrent_file.cpp bencode.hpp "sha1/sha1.h" "sha1/sha1.cpp" "socket.cpp" "socket.h")
+add_executable(torrent "torrent.cpp" "torrent_file.h" "utils/bencode/bencode.hpp" "utils/sha1/sha1.h" "utils/sha1/sha1.cpp" 
+    "utils/socket/socket.cpp" "utils/socket/socket.h" "peer.h" "utils/utils.h" "bit_message.h" "download_manager.h")
 target_link_libraries(torrent PRIVATE cpr::cpr)
 target_link_libraries(torrent PRIVATE wsock32 ws2_32)
