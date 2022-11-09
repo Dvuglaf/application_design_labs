@@ -62,6 +62,11 @@ public:
 					else if (message.get_id() == bit_message::unchoke) {
 						p->set_status("unchoked");  // start request pieces
 					}
+					else if (message.get_id() == bit_message::have) {
+						p->update_bitfield_from_have_message(message);
+						p->send_interested();
+						continue;
+					}
 					else if (message.get_id() == bit_message::piece) {
 						p->set_status("received piece");
 						std::string data = message.get_payload().substr(8);  // index + begin + data
@@ -92,6 +97,7 @@ public:
 
 			}
 			catch (wrong_connection& e) {
+				p->set_status("");
 				std::cout << e.what() << std::endl;
 
 				using namespace std::chrono_literals;
@@ -99,6 +105,7 @@ public:
 				continue;
 			}
 			catch (std::exception& e) {
+				p->set_status("");
 				std::cout << e.what() << ": " << "one peer disconnected\n";
 				return;
 			}
@@ -148,7 +155,7 @@ public:
 			using namespace std::chrono_literals;
 			std::this_thread::sleep_for(1000ms);
 
-			if (_piece_downloaded.load() == 0 && diff > 30.) {
+			if (_piece_downloaded.load() == 0 && diff > 200.) {
 				std::cout << "Can't download file, problem with peers...";
 				return "";
 			}
