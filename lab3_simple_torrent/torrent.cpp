@@ -19,7 +19,12 @@ public:
 
 	void download(const std::string& path_to_file, const std::string& path_to_output_dir) {
 		try {
-			_file.add_file(path_to_file);
+			try {
+				_file.add_file(path_to_file);
+			}
+			catch (...) {
+				throw std::invalid_argument("File does not exists or has wrong structure.");
+			}
 
 			std::vector<std::shared_ptr<peer>> peers = get_peers();
 			std::cout << "get [" << peers.size() << "] peers from tracker\n";
@@ -89,15 +94,24 @@ private:
 	}
 
 	std::vector<std::shared_ptr<peer>> get_peers() {
-		const auto announce_url = _file.get_announce();
-		const auto info_hash = _file.get_info_hash();
+		const std::string announce_url = _file.get_announce();
+		const std::string info_hash = _file.get_info_hash();
 
 		request_params params{ announce_url, _id, info_hash,
 			0ull, 0ull, _file.get_file_size(), 6881 };
 
-		const auto tracker_response = get_peers_request(params);
-		const auto response_dict = std::get<bencode::dict>(bencode::decode(tracker_response));
+		std::string tracker_response;
+		try {
+			const auto tracker_response = get_peers_request(params);
+			if (tracker_response.empty()) {
+				throw;
+			}
+		}
+		catch (...) {
+			throw std::runtime_error("Problem with torrent tracker.");
+		}
 
+		const auto response_dict = std::get<bencode::dict>(bencode::decode(tracker_response));
 		std::vector<std::shared_ptr<peer>> peers;
 		if (response_dict->find("peers")->second.index() == 2) {  // peers as bencoded data (list)
 			bencode::list peers_list = std::get<bencode::list>(response_dict->find("peers")->second);
