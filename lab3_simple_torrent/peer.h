@@ -147,6 +147,16 @@ public:
 
 	}
 
+	void update_bitfield_from_have_message(const bit_message& message) {
+		size_t index = get_number_from_raw<size_t>(message.get_payload());
+		if (index >= _bitfield.size()) {
+			for (size_t i = _bitfield.size(); i < index; ++i) {
+				_bitfield.push_back('\0');
+			}
+		}
+		_bitfield[index] = '1';
+	}
+
 	bit_message receive_message() const {
 		std::string answer = receive_via_socket(_connect_socket);
 
