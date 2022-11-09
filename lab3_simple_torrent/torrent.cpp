@@ -102,7 +102,7 @@ private:
 
 		std::string tracker_response;
 		try {
-			const auto tracker_response = get_peers_request(params);
+			tracker_response = get_peers_request(params);
 			if (tracker_response.empty()) {
 				throw;
 			}
@@ -129,10 +129,10 @@ private:
 			bencode::string peers_string = std::get<bencode::string>(response_dict->find("peers")->second);
 			for (size_t i = 0; i < peers_string.size(); i += 6) {
 				std::string ip;
-				ip += std::to_string(ntohs(peers_string[i])) + ".";
-				ip += std::to_string(ntohs(peers_string[i + 1])) + ".";
-				ip += std::to_string(ntohs(peers_string[i + 2])) + ".";
-				ip += std::to_string(ntohs(peers_string[i + 3]));
+				ip += std::to_string((peers_string[i] + 256) % 256) + ".";
+				ip += std::to_string((peers_string[i + 1] + 256) % 256) + ".";
+				ip += std::to_string((peers_string[i + 2] + 256) % 256) + ".";
+				ip += std::to_string((peers_string[i + 3] + 256) % 256);
 
 				std::string port_data = peers_string.substr(i + 4, 2);
 				uint16_t port = get_number_from_raw<uint16_t>(port_data);
