@@ -4,9 +4,10 @@
 #include <mutex>
 #include "utils/socket/socket.h"
 #include <opencv2/opencv.hpp>
+#include <regex>
 
 const int16_t CLIENT_PORT = 7777;
-const std::string LOCAL_IP = "127.0.0.1";
+const std::string LOCAL_IP = "192.168.1.2";
 
 std::vector<uchar> frame_encoded;
 std::mutex mutex;
@@ -41,17 +42,29 @@ int main() {
 	std::thread show(show_frame);
 	show.detach();
 
+	server_socket.send("Hello!", 7);
+
+	char received_header[150];
+	int received_bytes = server_socket.recv(received_header, 150); // header
+
 	while (true) {
-		int frame_size = 0;
-		int received_bytes = server_socket.recv((char*)&frame_size, sizeof(int)); // size
+		char received_length[100];
+		int received_bytes = server_socket.recv(received_length, 100); // length
 		std::cout << "Received frame size: " << received_bytes << " bytes\n";
-		char* received = new char[frame_size];
-		received_bytes = server_socket.recv(received, frame_size); // frame
+		std::string length_str(received_length, received_bytes);
+		std::smatch match;
+		std::regex_search(length_str, match, std::regex("\\d+"));
+		length_str = match.str(0);
+		int length = std::stoi(length_str);
+		std::cout << "Received frame size: " << length << "\n";
+
+		char* received = new char[length];
+		received_bytes = server_socket.recv(received, length); // frame
 		std::cout << "Received frame: " << received_bytes << " bytes\n";
-		if (received_bytes < frame_size) {
+		if (received_bytes < length) {
 			std::cout << "\n\n\n\n" << "Failed to receive full frame. Skipping this frame ..." << "\n\n\n\n";
-			char* lost_data = new char[frame_size - received_bytes];
-			received_bytes = server_socket.recv(lost_data, frame_size - received_bytes); // lost frame
+			char* lost_data = new char[length - received_bytes];
+			received_bytes = server_socket.recv(lost_data, length - received_bytes); // lost frame
 			delete[] lost_data;
 			delete[] received;
 			continue;
@@ -65,6 +78,6 @@ int main() {
 		mutex.unlock();
 
 		delete[] received;
-		
+
 	}
 }

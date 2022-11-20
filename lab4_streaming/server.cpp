@@ -4,12 +4,22 @@
 #include <vector>
 #include <mutex>
 #include "utils/socket/socket.h"
+#include <chrono>
+
+using namespace std::chrono_literals;
 
 const int16_t CLIENT_PORT = 7777;
 const int16_t REPEATER_PORT = 7778;
-const std::string LOCAL_IP = "127.0.0.1";
+const std::string LOCAL_IP = "192.168.1.2";
 std::mutex mutex;
 std::vector<socket_wrapper> clients;
+
+std::string header = "HTTP/1.0 200 OK\r\n";
+std::string params = "Server: Mozarella/2.2\r\n"
+"Accept-Range: bytes\r\n"
+"Connection: close\r\n"
+"Content-Type: multipart/x-mixed-replace; boundary=mjpegstream\r\n"
+"\r\n";
 
 void client_connections() {
 
@@ -21,6 +31,7 @@ void client_connections() {
 		socket_wrapper client_socket = master_socket_2.accept();
 		std::cout << "New client connected" << std::endl;
 		mutex.lock();
+		client_socket.send((header + params).c_str(), (header + params).size());
 		clients.push_back(std::move(client_socket));
 		mutex.unlock();
 	}
@@ -56,9 +67,15 @@ int main() {
 		}
 
 		mutex.lock();
-		for (const auto& client : clients) {
-			client.send((char*)&frame_size, sizeof(int));
-			client.send(received, frame_size);
+		for (auto it = clients.begin(); it < clients.end(); ++it) {
+			int result = it->select(0, 1000);
+			if (result == -1) {
+				clients.erase(it);
+				break;
+			}
+			std::string body = "--mjpegstream\r\nContent - Type: image / jpeg\r\nContent - Length: " + std::to_string(frame_size) + "\r\n\r\n";
+			it->send(body.c_str(), body.size());
+			it->send(received, frame_size);
 		}
 		mutex.unlock();
 		delete[] received;
