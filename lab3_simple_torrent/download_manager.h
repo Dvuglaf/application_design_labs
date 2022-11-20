@@ -40,11 +40,11 @@ public:
 
 	void peer_download_pieces(const std::shared_ptr<peer>& p, const std::string& info_hash, const std::string& client_id) {
 		while (!_is_complete.load()) {
+			uint32_t index = ULONG_MAX;
 			try {
 				p->establish_peer_connection({ info_hash, client_id });
 				p->send_interested();
 
-				uint32_t index = ULONG_MAX;
 				while (!_is_complete.load()) {
 
 					bit_message message = p->receive_message();
@@ -98,6 +98,9 @@ public:
 			}
 			catch (wrong_connection& e) {
 				p->set_status("");
+				_mutex.lock();
+				set_piece_status(index, "not downloaded");
+				_mutex.unlock();
 				std::cout << e.what() << std::endl;
 
 				using namespace std::chrono_literals;
@@ -105,6 +108,9 @@ public:
 				continue;
 			}
 			catch (std::exception& e) {
+				_mutex.lock();
+				set_piece_status(index, "not downloaded");
+				_mutex.unlock();
 				p->set_status("");
 				std::cout << e.what() << ": " << "one peer disconnected\n";
 				return;
