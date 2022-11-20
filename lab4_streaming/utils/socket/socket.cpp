@@ -71,7 +71,15 @@ void socket_wrapper::listen(int max_connections) const {
 }
 
 socket_wrapper socket_wrapper::accept() const {
-	SOCKET s = ::accept(_socket, NULL, NULL);
+	sockaddr_in new_ca;
+	int new_len = sizeof(new_ca);
+	ZeroMemory(&new_ca, sizeof(new_ca));
+
+	SOCKET s = ::accept(_socket, (sockaddr*)&new_ca, &new_len);
+	//SOCKET s = ::accept(_socket, NULL, NULL);
+	
+	if (new_len != 0)
+		std::cout << "Connection from " << inet_ntoa((in_addr)new_ca.sin_addr) << ":" << new_ca.sin_port << std::endl;
 
 	if (s == INVALID_SOCKET)
 		throw std::runtime_error(std::string("accept function failed with error ") + std::to_string(WSAGetLastError()));
