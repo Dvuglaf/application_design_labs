@@ -11,7 +11,7 @@ using namespace std::chrono_literals;
 const int16_t REPEATER_PORT = 7778;
 const std::string LOCAL_IP = "192.168.1.2";
 
-int main() {
+int main() try {
 	cv::Mat frame;
 	cv::VideoCapture webcam(0);
 	
@@ -29,6 +29,9 @@ int main() {
 		std::cout << "Sent frame size: " << bytes_sent << " bytes\n";
 		bytes_sent = server_socket.send((char*)&encoded_image[0], frame_size);
 		std::cout << "Sent frame: " << bytes_sent << " bytes\n";
-		//std::this_thread::sleep_for(30ms);
+		std::this_thread::sleep_for(80ms);
 	}
+}
+catch (std::exception& e) {
+	std::cout << e.what() << std::endl;
 }

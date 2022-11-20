@@ -33,7 +33,7 @@ void show_frame() {
 }
 
 
-int main() {
+int main() try {
 	const socket_wrapper server_socket(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP);
 
 	server_socket.connect(address_family::IPV4, CLIENT_PORT, LOCAL_IP);
@@ -63,9 +63,9 @@ int main() {
 		std::cout << "Received frame: " << received_bytes << " bytes\n";
 		if (received_bytes < length) {
 			std::cout << "\n\n\n\n" << "Failed to receive full frame. Skipping this frame ..." << "\n\n\n\n";
-			char* lost_data = new char[length - received_bytes];
-			received_bytes = server_socket.recv(lost_data, length - received_bytes); // lost frame
-			delete[] lost_data;
+			//char* lost_data = new char[length - received_bytes];
+			//received_bytes = server_socket.recv(lost_data, length - received_bytes); // lost frame
+			//delete[] lost_data;
 			delete[] received;
 			continue;
 		}
@@ -80,4 +80,7 @@ int main() {
 		delete[] received;
 
 	}
+}
+catch (std::exception& e) {
+	std::cout << e.what() << std::endl;
 }

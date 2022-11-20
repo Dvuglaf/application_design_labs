@@ -37,7 +37,7 @@ void client_connections() {
 	}
 }
 
-int main() {
+int main() try {
 	const socket_wrapper master_socket(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP);
 
 	master_socket.bind(address_family::IPV4, REPEATER_PORT, LOCAL_IP);
@@ -52,13 +52,13 @@ int main() {
 	while (true) {
 		int frame_size = 0;
 		int received_bytes = repeater_socket.recv((char*)&frame_size, sizeof(int)); // size
-		std::cout << "Received frame size: " << received_bytes << " bytes\n";
-		std::cout << "Received frame size: " << frame_size << "\n";
+		/*std::cout << "Received frame size: " << received_bytes << " bytes\n";
+		std::cout << "Received frame size: " << frame_size << "\n";*/
 		char* received = new char[frame_size];
 		received_bytes = repeater_socket.recv(received, frame_size); // frame
-		std::cout << "Received frame: " << received_bytes << " bytes\n";
+		/*std::cout << "Received frame: " << received_bytes << " bytes\n";*/
 		if (received_bytes < frame_size) {
-			std::cout << "\n\n\n\n" << "Failed to receive full frame. Skipping this frame ..." << "\n\n\n\n";
+			/*std::cout << "\n\n\n\n" << "Failed to receive full frame. Skipping this frame ..." << "\n\n\n\n";*/
 			char* lost_data = new char[frame_size - received_bytes];
 			received_bytes = repeater_socket.recv(lost_data, frame_size - received_bytes); // lost frame
 			delete[] lost_data;
@@ -73,11 +73,22 @@ int main() {
 				clients.erase(it);
 				break;
 			}
-			std::string body = "--mjpegstream\r\nContent - Type: image / jpeg\r\nContent - Length: " + std::to_string(frame_size) + "\r\n\r\n";
-			it->send(body.c_str(), body.size());
-			it->send(received, frame_size);
+			try {
+				std::string body = "--mjpegstream\r\nContent - Type: image / jpeg\r\nContent - Length: " + std::to_string(frame_size) + "\r\n\r\n";
+				it->send(body.c_str(), body.size());
+				it->send(received, frame_size);
+			}
+			catch (std::exception& e) {
+				//std::cout << e.what() << std::endl;
+				std::cout << "Client disconnected" << std::endl;
+				clients.erase(it);
+				break;
+			}
 		}
 		mutex.unlock();
 		delete[] received;
 	}
+}
+catch (std::exception& e) {
+	std::cout << e.what() << std::endl;
 }
