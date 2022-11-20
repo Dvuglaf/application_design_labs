@@ -3,6 +3,10 @@
 #include <vector>
 #include "utils/socket/socket.h"
 #include <opencv2\opencv.hpp>
+#include <thread>
+#include <chrono>
+
+using namespace std::chrono_literals;
 
 const int16_t REPEATER_PORT = 7778;
 const std::string LOCAL_IP = "127.0.0.1";
@@ -25,5 +29,6 @@ int main() {
 		std::cout << "Sent frame size: " << bytes_sent << " bytes\n";
 		bytes_sent = server_socket.send((char*)&encoded_image[0], frame_size);
 		std::cout << "Sent frame: " << bytes_sent << " bytes\n";
+		//std::this_thread::sleep_for(10ms);
 	}
 }

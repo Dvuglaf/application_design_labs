@@ -12,11 +12,12 @@ std::mutex mutex;
 std::vector<socket_wrapper> clients;
 
 void client_connections() {
-	while (true) {
-		const socket_wrapper master_socket_2(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP);
-		master_socket_2.bind(address_family::IPV4, CLIENT_PORT, LOCAL_IP);
-		master_socket_2.listen(SOMAXCONN);
 
+	const socket_wrapper master_socket_2(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP);
+	master_socket_2.bind(address_family::IPV4, CLIENT_PORT, LOCAL_IP);
+	master_socket_2.listen(SOMAXCONN);
+
+	while (true) {
 		socket_wrapper client_socket = master_socket_2.accept();
 		std::cout << "New client connected" << std::endl;
 		mutex.lock();
@@ -45,9 +46,17 @@ int main() {
 		char* received = new char[frame_size];
 		received_bytes = repeater_socket.recv(received, frame_size); // frame
 		std::cout << "Received frame: " << received_bytes << " bytes\n";
-		
+		if (received_bytes < frame_size) {
+			std::cout << "\n\n\n\n" << "Failed to receive full frame. Skipping this frame ..." << "\n\n\n\n";
+			char* lost_data = new char[frame_size - received_bytes];
+			received_bytes = repeater_socket.recv(lost_data, frame_size - received_bytes); // lost frame
+			delete[] lost_data;
+			delete[] received;
+			continue;
+		}
+
 		mutex.lock();
-		for (const auto& client: clients) {
+		for (const auto& client : clients) {
 			client.send((char*)&frame_size, sizeof(int));
 			client.send(received, frame_size);
 		}
