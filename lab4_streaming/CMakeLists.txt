@@ -6,9 +6,9 @@ find_package(OpenCV REQUIRED)
 # utils
 include_directories(utils)
 
-add_executable(server server.cpp "utils/socket/socket.cpp" "utils/socket/socket.h" "utils/utils.hpp")
-add_executable(repeater repeater.cpp "utils/socket/socket.cpp" "utils/socket/socket.h" "utils/utils.hpp")
-add_executable(client client.cpp "utils/socket/socket.cpp" "utils/socket/socket.h" "utils/utils.hpp")
+add_executable(server server.cpp "utils/socket/socket.cpp" "utils/socket/socket.h")
+add_executable(repeater repeater.cpp "utils/socket/socket.cpp" "utils/socket/socket.h")
+add_executable(client client.cpp "utils/socket/socket.cpp" "utils/socket/socket.h")
 
 
 
