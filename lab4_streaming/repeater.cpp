@@ -4,8 +4,6 @@
 #include "utils/socket/socket.h"
 #include <opencv2\opencv.hpp>
 
-
-
 const int16_t REPEATER_PORT = 7778;
 const std::string LOCAL_IP = "127.0.0.1";
 
