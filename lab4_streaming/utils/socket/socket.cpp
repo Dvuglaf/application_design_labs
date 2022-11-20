@@ -97,6 +97,26 @@ int socket_wrapper::recv(char* buffer, int size) const {
 	return result;
 }
 
+int socket_wrapper::select(int timeout_sec, int timeout_usec) const {
+	// Set up the file descriptor set.
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(_socket, &fds);
+
+	// Set up the struct timeval for the timeout.
+	timeval tv;
+	tv.tv_sec = timeout_sec;
+	tv.tv_usec = timeout_usec;
+
+	// Wait until timeout or data received.
+	const int n = ::select(_socket, &fds, NULL, NULL, &tv);
+
+	if (n == 0)  // timeout
+		return -1;
+	else if (n == SOCKET_ERROR)
+		throw std::runtime_error(std::string("select function failed with error ") + std::to_string(WSAGetLastError()));
+}
+
 void socket_wrapper::shutdown(u_short type) const {
 	const int result = ::shutdown(_socket, type);
 	if (result == SOCKET_ERROR)

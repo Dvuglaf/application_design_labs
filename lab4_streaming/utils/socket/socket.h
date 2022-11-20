@@ -103,6 +103,8 @@ public:
 	*/
 	int recv(char* buffer, int size) const;
 
+	int select(int timeout_sec, int time_out_usec) const;
+
 	/**
 	* The shutdown function disables both send and receive operations.
 	* 
