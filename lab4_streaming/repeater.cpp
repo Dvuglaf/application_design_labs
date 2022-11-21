@@ -1,35 +1,40 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "utils/socket/socket.h"
-#include <opencv2\opencv.hpp>
 #include <thread>
 #include <chrono>
+#include "utils/socket/socket.h"
+#include <opencv2\opencv.hpp>
 
 using namespace std::chrono_literals;
 
 const int16_t REPEATER_PORT = 7778;
-const std::string LOCAL_IP = "192.168.1.2";
+static std::string SERVER_IP;
 
-int main() try {
+
+int main(int argc, char* argv[]) try {
+	if (argc != 2) {
+		throw std::invalid_argument("Enter 1 argument: SERVER_IP");
+	}
+	SERVER_IP = argv[1];
+
 	cv::Mat frame;
 	cv::VideoCapture webcam(0);
 	
 	const socket_wrapper server_socket(address_family::IPV4, socket_type::TCP_SOCKET, protocol::TCP);
 
-	server_socket.connect(address_family::IPV4, REPEATER_PORT, LOCAL_IP);
+	server_socket.connect(address_family::IPV4, REPEATER_PORT, SERVER_IP);
 	std::cout << "Connect successful" << std::endl;
 
 	while (true) {
 		webcam >> frame;
 		std::vector<uchar> encoded_image;
-		cv::imencode(".jpg", frame, encoded_image); // jpeg frame compression
+		cv::imencode(".jpg", frame, encoded_image);  // jpeg frame compression
 		int frame_size = encoded_image.size();
-		int bytes_sent = server_socket.send((char*)&frame_size, sizeof(int));
-		std::cout << "Sent frame size: " << bytes_sent << " bytes\n";
-		bytes_sent = server_socket.send((char*)&encoded_image[0], frame_size);
-		std::cout << "Sent frame: " << bytes_sent << " bytes\n";
-		std::this_thread::sleep_for(80ms);
+		
+		server_socket.send(reinterpret_cast<char*>(&frame_size), sizeof(int));
+		server_socket.send(reinterpret_cast<char*>(&encoded_image[0]), frame_size);
+		std::this_thread::sleep_for(80ms);  // 15 FPS 
 	}
 }
 catch (std::exception& e) {
