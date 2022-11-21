@@ -123,6 +123,7 @@ int socket_wrapper::select(int timeout_sec, int timeout_usec) const {
 		return -1;
 	else if (n == SOCKET_ERROR)
 		throw std::runtime_error(std::string("select function failed with error ") + std::to_string(WSAGetLastError()));
+	return 1;
 }
 
 void socket_wrapper::shutdown(u_short type) const {

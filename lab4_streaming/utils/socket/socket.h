@@ -103,6 +103,15 @@ public:
 	*/
 	int recv(char* buffer, int size) const;
 
+	/**
+	* Determines the status of socket during timeout.
+	* 
+	* @param timeout_sec:  maximum waiting time for socket activity in seconds
+	* @param timeout_usec: maximum waiting time for socket activity in microseconds
+	* 
+	* @return positive number if socket acitve, negative if not active during timeout
+	* 
+	*/
 	int select(int timeout_sec, int time_out_usec) const;
 
 	/**
@@ -112,7 +121,7 @@ public:
 	*/
 	void shutdown(u_short type) const;
 
-public:
+private:
 	SOCKET _socket;
 	static WSADATA _wsa;
 	static size_t _socket_count;
